@@ -1,0 +1,37 @@
+---
+interface Props {
+  tags: {
+    name: string
+    slug: string
+    count?: number
+  }[]
+}
+
+const { tags } = Astro.props
+---
+
+<!-- Apple Liquid Glass: grayscale pill tags (components.md §6) --><!-- Grayscale body text, subtle bg; hover with gentle lift; tabular-nums for counts -->{
+  tags.length === 0 ? (
+    <div class="text-center text-sm text-tertiary">暂无标签</div>
+  ) : (
+    <div class="flex flex-wrap gap-2.5">
+      {tags.map((tag) => (
+        <a
+          href={`/tags/${tag.slug}`}
+          class="inline-flex items-baseline gap-1.5 px-3 py-1.5
+            rounded-full text-sm
+            bg-secondary/40 dark:bg-secondary/30
+            text-secondary
+            hover:bg-secondary/60 dark:hover:bg-secondary/50
+            hover:-translate-y-[1px] hover:shadow-sm
+            transition-all duration-200 ease-out"
+        >
+          <span>{tag.name}</span>
+          {tag.count !== undefined && (
+            <span class="text-xs tabular-nums text-tertiary">({tag.count})</span>
+          )}
+        </a>
+      ))}
+    </div>
+  )
+}

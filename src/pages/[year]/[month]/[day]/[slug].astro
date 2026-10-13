@@ -1,0 +1,118 @@
+---
+import type { CollectionEntry } from 'astro:content'
+import MarkdownLayout from '@/layouts/MarkdownLayout.astro'
+import { getSortedPosts } from '@/utils/content'
+import MarkdownWrapper from '@/components/MarkdownWrapper.astro'
+import SectionBlock from '@/components/SectionBlock.astro'
+import { PostToc } from '@/components/post/PostToc'
+import PostMetaInfo from '@/components/post/PostMetaInfo.astro'
+import PostArchiveInfo from '@/components/post/PostArchiveInfo.astro'
+import { ReadingProgress } from '@/components/post/ReadingProgress'
+import { Outdate } from '@/components/post/Outdate'
+import PostNav from '@/components/post/PostNav.astro'
+import { Comments } from '@/components/comment'
+import { ActionAside } from '@/components/post/ActionAside'
+import { PostCopyright } from '@/components/post/PostCopyright'
+
+export async function getStaticPaths() {
+  const sortedPosts = await getSortedPosts()
+
+  return sortedPosts.map((post) => {
+    const d = post.data.date
+    const y = String(d.getFullYear())
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return {
+      params: { year: y, month: m, day, slug: post.slug },
+      props: { post },
+    }
+  })
+}
+
+interface Props {
+  post: CollectionEntry<'posts'>
+}
+
+const { post } = Astro.props
+const { year, month, day, slug } = Astro.params
+
+const sortedPosts = await getSortedPosts()
+const currentIndex = sortedPosts.findIndex((p) => p.slug === slug)
+const prev = currentIndex > 0 ? sortedPosts[currentIndex - 1] : undefined
+const next = currentIndex < sortedPosts.length - 1 ? sortedPosts[currentIndex + 1] : undefined
+
+const { headings, Content, remarkPluginFrontmatter } = await post.render()
+
+const mdSlug = `/${year}/${month}/${day}/${slug}`
+
+const mdDescription = concat(post.data.category || '', post.data.tags.join(', '))
+
+function concat(str1: string, str2: string, sep = ' / ') {
+  if (str1 && str2) return str1 + sep + str2
+  if (str1) return str1
+  if (str2) return str2
+  return ''
+}
+
+const lastMod = post.data.lastMod || post.data.date
+---
+
+<MarkdownLayout
+  title={post.data.title}
+  description={post.data.summary}
+  image={post.data.cover}
+  mdTitle={post.data.title}
+  mdDescription={mdDescription}
+  mdSlug={mdSlug}
+>
+  <div
+    class="max-w-[1100px] mx-auto px-4 md:px-8 py-16 grid lg:grid-cols-[auto_260px] gap-8"
+    data-pagefind-body
+  >
+    <div>
+      <header class="space-y-4">
+        <h1 class="text-4xl font-bold text-center">
+          {post.data.title}
+        </h1>
+        <PostMetaInfo
+          class="justify-center"
+          date={post.data.date}
+          words={remarkPluginFrontmatter.words}
+          readingMinutes={remarkPluginFrontmatter.readingMinutes}
+          postPath={mdSlug}
+          postTitle={post.data.title}
+        />
+        <PostArchiveInfo
+          class="justify-center"
+          category={post.data.category}
+          tags={post.data.tags}
+        />
+        <div>
+          <Outdate lastMod={lastMod} client:idle />
+        </div>
+      </header>
+    </div>
+    <div class="col-start-1 min-w-0">
+      <MarkdownWrapper>
+        <Content />
+      </MarkdownWrapper>
+    </div>
+    <div class="hidden lg:block" data-pagefind-ignore>
+      <aside class="sticky top-24">
+        <SectionBlock title="目录">
+          <PostToc headings={headings} client:idle />
+          <hr class="my-2 border-primary max-w-[100px]" />
+          <ReadingProgress client:idle />
+        </SectionBlock>
+        <ActionAside client:idle />
+      </aside>
+    </div>
+    <div data-pagefind-ignore>
+      <section class="space-y-6">
+        <PostCopyright title={post.data.title} slug={mdSlug} lastMod={lastMod} client:visible />
+        <PostNav prev={prev} next={next} />
+        {post.data.comments && <Comments />}
+      </section>
+    </div>
+  </div>
+</MarkdownLayout>

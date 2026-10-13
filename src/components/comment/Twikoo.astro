@@ -1,0 +1,690 @@
+<!--
+  Twikoo 评论容器 + 视觉覆盖
+  ───────────────────────────────────────────────
+  · 脚本源：官方 CDN（jsDelivr 主源 / unpkg 备源，见 Layout.astro 的 TWIKOO_JS），
+    本地 public/twikoo/ 已删除；初始化仍在 Layout.astro 的「评论驱动控制器」按需执行
+    （与 Waline 共享胶囊切换器），本文件只留容器与样式。
+
+  ⚠️ 关键：必须多包一层 data-engine="twikoo" 的外壳。
+  Twikoo 内部用 Vue 2 的 `new Vue({...}).$mount('#twikoo')`，
+  而 Vue 2 的 $mount(el) 会【替换掉】目标节点 —— 替换后：
+    1. #twikoo 这个 id 与 class 一并消失，直接给 #twikoo 加 display:none 无效；
+    2. 所有 #twikoo 作用域的样式全部失效。
+  所以：显隐与 data-ready 标记都放在外层永不被替换的壳上，
+        CSS 也一律以 [data-engine='twikoo'] 作用域，而非 #twikoo。
+
+  两行评论头（纯 CSS，不改任何 Twikoo 交互逻辑）：
+    第一行 = 头像 + 昵称 + 标签 + 日期   → .tk-main > .tk-row > .tk-meta 占满整行
+    第二行 = 点赞 / 踩 / 回复            → .tk-main > .tk-row > .tk-action 占满整行
+    子回复 .tk-replies 天然复用同一套结构（嵌套的 .tk-comment 走同样规则），
+    只需把它的左侧缩进从 1rem 减到 0.55rem，保留轻微层级感。
+
+  参考借鉴：blog.weasel6.cn 的 twikoo-custom.css ——
+    · 昵称链接走强调色 + 波浪下划线；
+    · 身份标签是「实心渐变药丸 + 深色文字」，并用 overflow:visible + ::before
+      把一枚 SVG 徽标探出药丸上沿（站长皇冠 / 置顶图钉 / 待审核时钟）。
+  本站改造：渐变色板换成「随机强调色 + accent 明暗插值」，所以标签颜色会
+  随每页的随机色变化，而不是固定的绿/红/黄；药丸带 accent 外发光。
+
+  两处「不能省」的坑：
+    1. 站长标签有双保险：官方 .tk-tag-green 只在 Twikoo 云端配了 MASTER_TAG 时
+       才渲染；没配时 .tk-comment.tk-master 里根本没有 .tk-tag →
+       用 .tk-meta:not(:has(.tk-tag)) .tk-nick::after 补一枚「站长」药丸兜底。
+    2. .tk-replies 的 max-height/overflow 带 !important，会把官方 .tk-replies-expand
+       （展开态解除裁剪）一起压回 → 点「展开」无效。必须再加一条
+       .tk-replies.tk-replies-expand 的同级 !important 才能展开。
+
+  为什么大量 !important：Twikoo 的 CSS 不是文件，而是 twikoo.all.min.js 运行时注入
+  <body> 的（Layout.astro 的 adoptTwikooStyles 会把它们挪出 <head> 防 Swup 清理），
+  本组件样式在 <head>、顺序在前 —— 同等特异性后写的赢，必须用 !important 压住。
+
+  与 Fancybox 的关系：选择器全部锁在 [data-engine='twikoo'] 内，
+  不出现 .fancybox / [data-fancybox]，也不覆盖 z-index / position:fixed，
+  与文章/相册灯箱零冲突（Twikoo 自带的 tk-lightbox 保持官方实现）。
+-->
+<div class="comment-driver is-active" data-engine="twikoo">
+  <div id="twikoo"></div>
+</div>
+
+<style is:global>
+  /* ═══════════════════════════════════════════════════════════
+     第一套 CSS：Twikoo 评论样式（暗黑液态玻璃 · 两行评论头 · 移动端优先）
+     ═══════════════════════════════════════════════════════════ */
+
+  /* ── 0. 字体继承：Twikoo 自带 element-ui 样式会写死系统字体栈 ── */
+  [data-engine='twikoo'],
+  [data-engine='twikoo'] * {
+    font-family: inherit;
+  }
+
+  /* ── 0.1 标签流光动画（四个身份标签共用一条 keyframe） ──
+     只移动背景位置：第一层是斜向高光条，第二层是纯色渐变（尺寸 100% 100%，
+     位置变化对其不可见）→ 视觉上只有高光在扫过，颜色本身不漂移。 */
+  @keyframes mcy-tag-sweep {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  /* ── 1. 列表头部：计数 + 排序 ── */
+  [data-engine='twikoo'] .tk-comments-title {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 0.4rem 0.9rem !important;
+    padding: 0.8rem 0.4rem !important;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border-primary) 35%, transparent) !important;
+    margin-bottom: 0.25rem !important;
+  }
+  [data-engine='twikoo'] .tk-comments-count {
+    color: var(--color-accent) !important;
+    font-weight: 700 !important;
+    font-size: 0.88rem !important;
+  }
+  [data-engine='twikoo'] .tk-sort-item {
+    color: var(--color-text-secondary) !important;
+    font-size: 0.72rem !important;
+    font-weight: 500 !important;
+    padding: 0.18rem 0.6rem !important;
+    border: 1px solid color-mix(in srgb, var(--color-border-primary) 55%, transparent) !important;
+    border-radius: 999px !important;
+    background: color-mix(in srgb, var(--color-text-primary) 4%, transparent) !important;
+    transition: all 0.25s ease !important;
+    cursor: pointer;
+  }
+  [data-engine='twikoo'] .tk-sort-item:hover,
+  [data-engine='twikoo'] .tk-sort-item.__active {
+    color: var(--color-accent) !important;
+    border-color: color-mix(in srgb, var(--color-accent) 45%, transparent) !important;
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent) !important;
+  }
+
+  /* ── 2. 单条评论外壳：头像 | 主体 ── */
+  [data-engine='twikoo'] .tk-comment {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+    margin-top: 0.7rem !important;
+    padding: 1rem !important;
+    border: 1px solid color-mix(in srgb, var(--color-border-primary) 20%, transparent) !important;
+    border-radius: 1rem !important;
+    background: color-mix(
+      in srgb,
+      var(--color-text-primary) 2%,
+      var(--color-bg-primary)
+    ) !important;
+    /* 关键修复：Twikoo 默认 word-break: break-all，中文昵称会被逐字断成"竖排"；
+       改回 normal 后中文只在自然位置换行，配合第 4 节的整行 meta 彻底杜绝竖排 */
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+    transition:
+      border-color 0.25s ease,
+      background-color 0.25s ease;
+  }
+  [data-engine='twikoo'] .tk-comment:hover {
+    border-color: color-mix(in srgb, var(--color-accent) 22%, transparent) !important;
+  }
+  /* 站长评论：左侧 accent 光带 */
+  [data-engine='twikoo'] .tk-comment.tk-master {
+    border-color: color-mix(in srgb, var(--color-accent) 32%, transparent) !important;
+    box-shadow: inset -2px 0 0 0 color-mix(in srgb, var(--color-accent) 55%, transparent);
+  }
+
+  /* ── 3. 主体区：允许在 flex 中收缩到 0，窄屏不撑出横向滚动 ── */
+  [data-engine='twikoo'] .tk-main {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+
+  /* ── 4. 两行布局核心：第一行 meta 占满整行，第二行 action 占满整行 ── */
+  [data-engine='twikoo'] .tk-main > .tk-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important; /* 允许 .tk-meta 与 .tk-action 各占一行 */
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 0.2rem 0.6rem !important;
+  }
+  /* 第一行：昵称 + 标签 + 日期（头像在 .tk-comment 层，与它同一水平线） */
+  [data-engine='twikoo'] .tk-main > .tk-row > .tk-meta {
+    flex: 1 1 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 0.2rem 0.55rem !important;
+    min-width: 0 !important;
+    line-height: 1.45 !important;
+  }
+  /* 第二行：点赞 / 踩 / 回复，与第一行用一条细线隔开 */
+  [data-engine='twikoo'] .tk-main > .tk-row > .tk-action {
+    flex: 0 0 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 0.2rem 0.65rem !important;
+    margin: 0.45rem 0 0 !important;
+    padding-top: 0.45rem !important;
+    border-top: 1px solid color-mix(in srgb, var(--color-border-primary) 22%, transparent);
+  }
+
+  /* ── 5. 第一行元素：昵称（横向 + 波浪线 + accent 辉光）/ 日期 / 标签 ── */
+  [data-engine='twikoo'] .tk-nick {
+    /* 颜色写在这里而非 .tk-nick-link：无主页链接的评论渲染的是
+       <strong class="tk-nick">（没有 -link），只写在 -link 上会让普通访客昵称变回默认色 */
+    color: var(--color-accent) !important;
+    font-weight: 700 !important;
+    font-size: 0.92rem !important;
+    line-height: 1.35 !important;
+    /* 强制横向书写，中文昵称只在整词位置换行、绝不逐字竖排 */
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+    /* 波浪下划线写在 .tk-nick 而不是 .tk-nick-link：Twikoo 对昵称有两个 DOM 分支 ——
+       有主页链接的是 <a class="tk-nick tk-nick-link">，没有的是 <strong class="tk-nick">
+       （bundle 700270 附近实测），两者都带 .tk-nick → 每一位用户的昵称下都有波浪线，
+       不会漏掉普通访客。颜色取 --color-accent（AccentColorInjector 每页随机注入）
+       → 波浪线颜色随每页随机强调色变化。浅色模式 62% 不透明度 + 1.6px 明显 */
+    text-decoration: underline wavy color-mix(in srgb, var(--color-accent) 62%, transparent) !important;
+    text-decoration-thickness: 1.6px !important;
+    text-underline-offset: 4px !important;
+    text-decoration-skip-ink: none !important;
+    transition:
+      text-shadow 0.25s ease,
+      transform 0.25s ease !important;
+  }
+  /* 暗色模式：降不透明度 + 减细线宽，深色底上柔和不刺眼 */
+  [data-theme='dark'] [data-engine='twikoo'] .tk-nick {
+    text-decoration-color: color-mix(in srgb, var(--color-accent) 36%, transparent) !important;
+    text-decoration-thickness: 1.2px !important;
+  }
+  /* 昵称链接：只负责「可点」的视觉（辉光 + 悬停上浮），波浪线本身由 .tk-nick 统一提供 */
+  [data-engine='twikoo'] .tk-nick-link {
+    color: var(--color-accent) !important;
+    text-shadow: 0 0 14px color-mix(in srgb, var(--color-accent) 28%, transparent) !important;
+    transition:
+      text-shadow 0.25s ease,
+      transform 0.25s ease !important;
+  }
+  [data-theme='dark'] [data-engine='twikoo'] .tk-nick-link {
+    text-shadow: 0 0 10px color-mix(in srgb, var(--color-accent) 18%, transparent) !important;
+  }
+  [data-engine='twikoo'] .tk-nick-link:hover {
+    text-decoration-color: color-mix(in srgb, var(--color-accent) 90%, transparent) !important;
+    text-shadow: 0 0 18px color-mix(in srgb, var(--color-accent) 55%, transparent) !important;
+    transform: translateY(-1px);
+  }
+  /* 暗色模式悬停也别把波浪线打太实 */
+  [data-theme='dark'] [data-engine='twikoo'] .tk-nick-link:hover {
+    text-decoration-color: color-mix(in srgb, var(--color-accent) 58%, transparent) !important;
+  }
+  /* 子回复里的昵称：官方默认 0.9em，这里统一给 0.86rem 保持层级 */
+  [data-engine='twikoo'] .tk-replies .tk-nick {
+    font-size: 0.86rem !important;
+  }
+  [data-engine='twikoo'] .tk-time {
+    color: color-mix(in srgb, var(--color-text-primary) 42%, transparent) !important;
+    font-size: 0.72rem !important;
+    font-weight: 400 !important;
+    white-space: nowrap !important; /* 日期整串不换行，避免窄屏被挤成竖列 */
+  }
+
+  /* ── 5.1 身份标签：实心渐变药丸 + 探出的 SVG 徽标 ── */
+  [data-engine='twikoo'] .tk-tag {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 0.1rem 0.5rem !important;
+    border-radius: 999px !important;
+    font-size: 0.62rem !important;
+    font-weight: 800 !important;
+    line-height: 1.4 !important;
+    letter-spacing: 0.04em !important;
+    /* 必须 visible：否则探出药丸上沿的徽标会被裁掉 */
+    overflow: visible !important;
+    /* 深色文字压在明亮渐变上，亮/暗模式都是高对比 */
+    color: #0b1020 !important;
+    border: 0 !important;
+    white-space: nowrap;
+  }
+  [data-engine='twikoo'] .tk-tag::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -0.85em;
+    width: 1.15em;
+    height: 1.15em;
+    transform: translateX(-50%);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* 站长标签兜底：Twikoo 云端没配 MASTER_TAG 时 .tk-tag 根本不会渲染
+     （bundle 实测 master 分支是 `comment.master ? <span class="tk-tag tk-tag-green">
+     {config.MASTER_TAG || i18n('COMMENT_MASTER_TAG')}</span> : null`），
+     用 ::after 补一枚「站长」药丸 + 皇冠小装饰。:has() 保证官方标签存在时不重复画；
+     不支持 :has() 的旧浏览器整条规则被丢弃 → 静默降级为无标签，不报错 */
+  [data-engine='twikoo'] .tk-comment.tk-master .tk-meta:not(:has(.tk-tag)) .tk-nick::after {
+    content: '站长';
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.35rem;
+    padding: 0.14rem 0.5rem 0.14rem 1.35rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    line-height: 1.35;
+    letter-spacing: 0.04em;
+    color: #0b1020;
+    white-space: nowrap;
+    vertical-align: 0.1em;
+    /* 三层背景：斜向高光条 + 皇冠装饰 + 强调色渐变底。
+       刻意不挂 mcy-tag-sweep 动画：那条 keyframe 只挪 background-position，
+       高光层 220% 尺寸看不出动，但 0.72em 的皇冠会被一起带着在药丸里横滑 */
+    background-image:
+      linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.42) 50%, transparent 65%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0,0,24,24' fill='%230b1020'%3E%3Cpath d='M12,2.2l2.9,6.2 6.8,.7-5.1,4.6 1.4,6.7L12,17.4 6,20.4l1.4-6.7L2.3,9.1l6.8-.7z'/%3E%3C/svg%3E"),
+      linear-gradient(
+        115deg,
+        color-mix(in srgb, var(--color-accent) 90%, #000),
+        color-mix(in srgb, var(--color-accent) 45%, #fff) 50%,
+        color-mix(in srgb, var(--color-accent) 88%, #000)
+      );
+    background-size:
+      220% 100%,
+      0.72em 0.72em,
+      100% 100%;
+    background-position:
+      0 0,
+      0.44rem center,
+      0 0;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    box-shadow:
+      0 1px 6px color-mix(in srgb, var(--color-accent) 45%, transparent),
+      0 0 12px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+
+  /* 站长（MASTER_TAG）：跟随本页随机强调色的流光药丸 */
+  [data-engine='twikoo'] .tk-tag-green {
+    background:
+      linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.42) 50%, transparent 65%),
+      linear-gradient(
+        115deg,
+        color-mix(in srgb, var(--color-accent) 90%, #000),
+        color-mix(in srgb, var(--color-accent) 45%, #fff) 50%,
+        color-mix(in srgb, var(--color-accent) 88%, #000)
+      ) !important;
+    background-size:
+      220% 100%,
+      100% 100% !important;
+    background-repeat: no-repeat, no-repeat !important;
+    animation: mcy-tag-sweep 3.2s linear infinite !important;
+    box-shadow:
+      0 1px 6px color-mix(in srgb, var(--color-accent) 45%, transparent),
+      0 0 12px color-mix(in srgb, var(--color-accent) 30%, transparent) !important;
+  }
+  [data-engine='twikoo'] .tk-tag-green::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0,0,24,24' fill='%230b1020'%3E%3Cpath d='M12,2.2l2.9,6.2 6.8,.7-5.1,4.6 1.4,6.7L12,17.4 6,20.4l1.4-6.7L2.3,9.1l6.8-.7z'/%3E%3C/svg%3E");
+  }
+
+  /* 置顶（COMMENT_TOP_TAG）：红橙渐变 + 图钉 */
+  [data-engine='twikoo'] .tk-tag-red {
+    background:
+      linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.32) 50%, transparent 65%),
+      linear-gradient(115deg, #ff9a5c, #ff4d5e 52%, #ff2f7d) !important;
+    background-size:
+      220% 100%,
+      100% 100% !important;
+    background-repeat: no-repeat, no-repeat !important;
+    animation: mcy-tag-sweep 3.6s linear infinite !important;
+    box-shadow: 0 1px 6px rgba(255, 77, 94, 0.42) !important;
+  }
+  [data-engine='twikoo'] .tk-tag-red::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0,0,24,24' fill='%230b1020'%3E%3Cpath d='M14,4v5h5l-5.5,5.5 1.42,1.42L19,9.91V15h2V4H14zM6,9H4v11h2v-5h5v5h2V9H6z'/%3E%3C/svg%3E");
+  }
+
+  /* 待审核（COMMENT_REVIEWING_TAG）：琥珀渐变 + 时钟 */
+  [data-engine='twikoo'] .tk-tag-yellow {
+    background:
+      linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.32) 50%, transparent 65%),
+      linear-gradient(115deg, #ffe082, #ffb02e 55%, #ff8a3d) !important;
+    background-size:
+      220% 100%,
+      100% 100% !important;
+    background-repeat: no-repeat, no-repeat !important;
+    animation: mcy-tag-sweep 4s linear infinite !important;
+    box-shadow: 0 1px 6px rgba(255, 176, 46, 0.4) !important;
+  }
+  [data-engine='twikoo'] .tk-tag-yellow::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0,0,24,24' fill='%230b1020'%3E%3Cpath d='M12,2C6.5,2,2,6.5,2,12s4.5,10,10,10,10,-4.5,10,-10S17.5,2,12,2zM12,20c-4.4,0,-8,-3.6,-8,-8s3.6,-8,8,-8,8,3.6,8,8S16.4,20,12,20zM12.5,7H11v6l5.2,3.2 0.8,-1.3-4.5,-2.7V7z'/%3E%3C/svg%3E");
+  }
+
+  /* 备用第四色（邻居 / MASTER_TAG4 等）：蓝紫渐变 + 皇冠，保留给未来扩展 */
+  [data-engine='twikoo'] .tk-tag-blue {
+    background:
+      linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.32) 50%, transparent 65%),
+      linear-gradient(115deg, #5ab8ff, #2f86ff 55%, #6d5efc) !important;
+    background-size:
+      220% 100%,
+      100% 100% !important;
+    background-repeat: no-repeat, no-repeat !important;
+    animation: mcy-tag-sweep 3.4s linear infinite !important;
+    box-shadow: 0 1px 6px rgba(47, 134, 255, 0.42) !important;
+  }
+  [data-engine='twikoo'] .tk-tag-blue::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0,0,24,24' fill='%230b1020'%3E%3Cpath d='M5,16L3,6l5.5,4L12,4l3.5,6L21,6l-2,10H5zM5,18h14v2H5z'/%3E%3C/svg%3E");
+  }
+
+  /* ── 6. 第二行元素：点赞 / 踩 / 回复按钮（accent 药丸，悬停实心） ── */
+  [data-engine='twikoo'] .tk-action-link {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.35rem !important;
+    margin: 0 !important;
+    padding: 0.26rem 0.7rem !important;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent) !important;
+    border-radius: 999px !important;
+    /* 默认就是强调色（不再是灰字），亮/暗模式跟着随机色走 */
+    color: var(--color-accent) !important;
+    background: color-mix(in srgb, var(--color-accent) 9%, transparent) !important;
+    font-size: 0.78rem !important;
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+    transition:
+      color 0.22s ease,
+      background-color 0.22s ease,
+      border-color 0.22s ease,
+      box-shadow 0.22s ease,
+      transform 0.22s ease !important;
+    cursor: pointer;
+  }
+  /* 悬停 / 聚焦：整颗变实心强调色 + 外发光 */
+  [data-engine='twikoo'] .tk-action-link:hover,
+  [data-engine='twikoo'] .tk-action-link:focus-visible {
+    color: #fff !important;
+    background: var(--color-accent) !important;
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--color-accent) 42%, transparent);
+    transform: translateY(-1px);
+  }
+  /* 已点赞：实心强调色，图标与计数转白 */
+  [data-engine='twikoo'] .tk-action-link.tk-liked {
+    color: #fff !important;
+    background: var(--color-accent) !important;
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent) 38%, transparent);
+  }
+  [data-engine='twikoo'] .tk-action-link.tk-liked:hover {
+    background: color-mix(in srgb, var(--color-accent) 84%, #000) !important;
+    border-color: color-mix(in srgb, var(--color-accent) 84%, #000) !important;
+  }
+  /* 已踩：实心红，与点赞区分开 */
+  [data-engine='twikoo'] .tk-action-link.tk-disliked,
+  [data-engine='twikoo'] .tk-action-link.tk-disliked:hover {
+    color: #fff !important;
+    background: #f56c6c !important;
+    border-color: #f56c6c !important;
+    box-shadow: 0 0 12px rgba(245, 108, 108, 0.4);
+  }
+  /* 图标继承按钮颜色（官方用固定 #409eff，这里交给 currentColor） */
+  [data-engine='twikoo'] .tk-action-icon,
+  [data-engine='twikoo'] .tk-action-icon-solid {
+    color: currentColor !important;
+    flex-shrink: 0;
+  }
+  /* 计数：官方给的是 height/line-height 1.5rem 的固定盒子，
+     会把第二行整体撑高、按钮纵向不再居中 → 归零成纯文本 */
+  [data-engine='twikoo'] .tk-action-count {
+    height: auto !important;
+    line-height: 1.2 !important;
+    font-size: 0.74rem !important;
+    font-weight: 700 !important;
+    font-variant-numeric: tabular-nums !important;
+    margin-left: 0.1rem !important;
+  }
+
+  /* 站长悬停才出现的「加精 / 屏蔽」等操作按钮：
+     官方默认 .tk-actions{display:none} + .tk-comment:hover 才显示，
+     不能加 !important 常显，否则每个评论都会露出管理按钮 */
+  [data-engine='twikoo'] .tk-actions {
+    display: none !important;
+    margin-left: 0.3rem !important;
+    line-height: 1 !important;
+  }
+  [data-engine='twikoo'] .tk-comment:hover .tk-actions {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.35rem !important;
+  }
+  [data-engine='twikoo'] .tk-actions button {
+    appearance: none !important;
+    background: none !important;
+    border: 0 !important;
+    padding: 0.14rem 0.45rem !important;
+    margin: 0 !important;
+    border-radius: 999px !important;
+    color: var(--color-accent) !important;
+    font-size: 0.68rem !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease !important;
+  }
+  [data-engine='twikoo'] .tk-actions button:hover {
+    background: color-mix(in srgb, var(--color-accent) 15%, transparent) !important;
+  }
+
+  /* ── 7. 头像 ── */
+  [data-engine='twikoo'] .tk-avatar {
+    flex-shrink: 0 !important;
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    margin-right: 0 !important; /* 间距交给 .tk-comment 的 gap，避免双重间距 */
+    border-radius: 0.75rem !important;
+    border: 1px solid color-mix(in srgb, var(--color-border-primary) 15%, transparent) !important;
+    overflow: hidden;
+    transition:
+      transform 0.2s ease,
+      border-color 0.2s ease;
+  }
+  [data-engine='twikoo'] .tk-avatar .tk-avatar-img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 0.75rem !important;
+    /* 无头像时的默认人形 SVG 用 accent 上色（twikoo 全局 svg{fill:currentColor}） */
+    color: color-mix(in srgb, var(--color-accent) 55%, var(--color-text-secondary)) !important;
+  }
+  [data-engine='twikoo'] .tk-avatar.tk-has-avatar {
+    background: color-mix(in srgb, var(--color-text-primary) 6%, transparent) !important;
+  }
+  [data-engine='twikoo'] .tk-avatar.tk-clickable {
+    cursor: pointer !important;
+  }
+  [data-engine='twikoo'] .tk-avatar.tk-clickable:hover {
+    border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+    transform: translateY(-1px);
+  }
+
+  /* ── 8. 评论正文 ── */
+  [data-engine='twikoo'] .tk-content {
+    color: var(--color-text-primary) !important;
+    line-height: 1.75 !important;
+    font-size: 0.9rem !important;
+    margin-top: 0.45rem !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+  [data-engine='twikoo'] .tk-content a {
+    color: var(--color-accent) !important;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  [data-engine='twikoo'] .tk-ruser {
+    color: var(--color-accent) !important;
+    font-weight: 600 !important;
+  }
+  /* 正文里的图片：跟着容器收缩（官方默认 max-width/max-height: 300px 在窄屏仍会溢出） */
+  [data-engine='twikoo'] .tk-content img {
+    max-width: 100% !important;
+    max-height: 20rem !important;
+    border-radius: 0.5rem;
+  }
+  /* 正文里的代码：移动端自动折行，不产生横向滚动 */
+  [data-engine='twikoo'] .tk-content pre {
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.85em;
+  }
+
+  /* ── 9. 子回复：缩进减到 0.55rem，保留轻微层级 ── */
+  [data-engine='twikoo'] .tk-replies {
+    position: relative;
+    margin: 0.5rem 0 0 !important;
+    padding: 0.15rem 0 0.15rem 0.55rem !important;
+    /* max-height 略高于官方 200px，仍小于 twikoo 内部 236px 的"展开"判定阈值 */
+    max-height: 220px !important;
+    overflow: hidden !important;
+    border-left: 2px solid color-mix(in srgb, var(--color-accent) 18%, transparent) !important;
+    border-radius: 0 0.6rem 0.6rem 0.6rem;
+  }
+  /* 展开态修复：Twikoo 用 .tk-replies-expand{max-height:none;overflow:unset}
+     解除裁剪（bundle 3373 模块内），但上一条 .tk-replies 的选择器特异性更高、
+     且带 !important → 会把展开态一起压回 220px + overflow:hidden，
+     点「展开」后下方评论（尤其是二级回复里新加的三级回复）依然看不见。
+     这里用同级特异性 + !important 显式放开 */
+  [data-engine='twikoo'] .tk-replies.tk-replies-expand {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  /* 展开 / 收起按钮 */
+  [data-engine='twikoo'] .tk-expand {
+    display: block !important;
+    text-align: center !important;
+    color: var(--color-accent) !important;
+    font-size: 0.74rem !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 0 !important;
+    margin-top: 0.35rem !important;
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--color-accent) 6%, transparent) !important;
+    transition: background-color 0.2s ease !important;
+  }
+  [data-engine='twikoo'] .tk-expand:hover {
+    background: color-mix(in srgb, var(--color-accent) 14%, transparent) !important;
+  }
+
+  /* ── 10. 提交表单（昵称 / 邮箱 / 链接 + 文本域 + 按钮，element-ui 样式） ── */
+  [data-engine='twikoo'] .el-input__inner,
+  [data-engine='twikoo'] .el-textarea__inner {
+    color: var(--color-text-primary) !important;
+    background: color-mix(
+      in srgb,
+      var(--color-text-primary) 3%,
+      var(--color-bg-primary)
+    ) !important;
+    border: 1px solid color-mix(in srgb, var(--color-border-primary) 30%, transparent) !important;
+    border-radius: 0.75rem !important;
+    font-size: 0.85rem !important;
+    line-height: 1.6 !important;
+  }
+  [data-engine='twikoo'] .el-input__inner {
+    padding: 0.45rem 0.75rem !important;
+  }
+  [data-engine='twikoo'] .el-textarea__inner {
+    padding: 0.9rem !important;
+  }
+  [data-engine='twikoo'] .el-input__inner:focus,
+  [data-engine='twikoo'] .el-textarea__inner:focus {
+    outline: none !important;
+    border-color: var(--color-accent) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
+  }
+  [data-engine='twikoo'] .tk-submit .el-button {
+    padding: 0.4rem 1.1rem !important;
+    border-radius: 999px !important;
+    border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent) !important;
+    background: color-mix(in srgb, var(--color-accent) 8%, transparent) !important;
+    color: var(--color-accent) !important;
+    font-weight: 600 !important;
+    font-size: 0.78rem !important;
+    transition: all 0.25s ease !important;
+  }
+  [data-engine='twikoo'] .tk-submit .el-button:hover,
+  [data-engine='twikoo'] .tk-submit .el-button:focus {
+    background: var(--color-accent) !important;
+    color: #fff !important;
+    border-color: var(--color-accent) !important;
+  }
+  [data-engine='twikoo'] .tk-submit .el-button + .el-button {
+    margin-left: 0.5rem;
+  }
+
+  /* ── 11. 移动端微调（≤640px） ── */
+  @media (max-width: 640px) {
+    [data-engine='twikoo'] .tk-comment {
+      gap: 0.6rem !important;
+      padding: 0.8rem !important;
+    }
+    [data-engine='twikoo'] .tk-avatar {
+      width: 2rem !important;
+      height: 2rem !important;
+      border-radius: 0.6rem !important;
+    }
+    [data-engine='twikoo'] .tk-avatar .tk-avatar-img {
+      border-radius: 0.6rem !important;
+    }
+    [data-engine='twikoo'] .tk-nick {
+      font-size: 0.86rem !important;
+    }
+    [data-engine='twikoo'] .tk-content {
+      font-size: 0.86rem !important;
+    }
+    [data-engine='twikoo'] .tk-main > .tk-row > .tk-meta {
+      gap: 0.2rem 0.45rem !important;
+    }
+    [data-engine='twikoo'] .tk-main > .tk-row > .tk-action {
+      gap: 0.15rem 0.4rem !important;
+    }
+    [data-engine='twikoo'] .tk-action-link {
+      padding: 0.22rem 0.6rem !important;
+      font-size: 0.74rem !important;
+    }
+    [data-engine='twikoo'] .tk-tag {
+      font-size: 0.6rem !important;
+      padding: 0.08rem 0.45rem !important;
+    }
+    [data-engine='twikoo'] .tk-replies {
+      padding-left: 0.4rem !important;
+    }
+  }
+
+  /* ── 12. 动效降级 ── */
+  @media (prefers-reduced-motion: reduce) {
+    [data-engine='twikoo'] .tk-comment,
+    [data-engine='twikoo'] .tk-avatar,
+    [data-engine='twikoo'] .tk-nick,
+    [data-engine='twikoo'] .tk-sort-item,
+    [data-engine='twikoo'] .tk-action-link,
+    [data-engine='twikoo'] .tk-actions button,
+    [data-engine='twikoo'] .tk-expand,
+    [data-engine='twikoo'] .tk-submit .el-button {
+      transition: none !important;
+    }
+    /* 标签流光一并停掉，避免动效敏感用户被持续刷光 */
+    [data-engine='twikoo'] .tk-tag-green,
+    [data-engine='twikoo'] .tk-tag-red,
+    [data-engine='twikoo'] .tk-tag-yellow,
+    [data-engine='twikoo'] .tk-tag-blue {
+      animation: none !important;
+    }
+  }
+</style>

@@ -1,0 +1,76 @@
+---
+import type { GetStaticPaths } from 'astro'
+import PageLayout from '@/layouts/PageLayout.astro'
+import PostList from '@/components/post/PostList.astro'
+import PostPagination from '@/components/post/PostPagination.astro'
+import { getSortedPosts } from '@/utils/content'
+import appConfig from '@/config.json'
+import type { CollectionEntry } from 'astro:content'
+import Hero from '@/components/hero/Hero.astro'
+import ProfileCard from '@/components/sidebar/ProfileCard.astro'
+import YiyanCard from '@/components/sidebar/YiyanCard.astro'
+import GreetingClock from '@/components/sidebar/GreetingClock'
+import BgImageCard from '@/components/sidebar/BgImageCard.astro'
+import SiteInfoCard from '@/components/sidebar/SiteInfoCard.astro'
+
+export const getStaticPaths = (async () => {
+  const sortedPosts = await getSortedPosts()
+  const { perPage } = appConfig.posts
+  const totalPage = Math.ceil(sortedPosts.length / perPage)
+
+  const paths = Array.from({ length: totalPage }).map((_, i) => {
+    const data = sortedPosts.slice(i * perPage, (i + 1) * perPage)
+    const props = { currentPage: i + 1, totalPage, data }
+    const params = {
+      page: i === 0 ? undefined : `page/${i + 1}`,
+    }
+    return { params, props }
+  })
+
+  return paths
+}) satisfies GetStaticPaths
+
+interface Props {
+  currentPage: number
+  totalPage: number
+  data: CollectionEntry<'posts'>[]
+}
+
+const { currentPage, totalPage, data } = Astro.props
+
+const getPageUrl = (page: number) => {
+  if (page === 1) return '/'
+  return `/page/${page}`
+}
+---
+
+<PageLayout transparentBg={currentPage === 1}>
+  <div>
+    {currentPage === 1 && <Hero />}
+    {
+      currentPage === 1 ? (
+        <div class="home-grid max-w-[1200px] px-4 md:px-8 py-10 mx-auto">
+          <div class="min-w-0">
+            <PostList posts={data} />
+          </div>
+          <aside class="right-sidebar sidebar-col">
+            <ProfileCard />
+            <YiyanCard />
+            <GreetingClock client:load />
+            <BgImageCard />
+            <SiteInfoCard />
+          </aside>
+        </div>
+      ) : (
+        <div class="max-w-[780px] px-4 md:px-8 py-20 mx-auto">
+          <PostList posts={data} />
+        </div>
+      )
+    }
+    {
+      totalPage > 1 && (
+        <PostPagination current={currentPage} total={totalPage} getPageUrl={getPageUrl} />
+      )
+    }
+  </div>
+</PageLayout>

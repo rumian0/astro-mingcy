@@ -1,0 +1,105 @@
+---
+import { site } from '@/config.json'
+import packageJson from '@/../package.json'
+
+const blogVersion = packageJson.version
+
+const deps = {
+  astro: packageJson.dependencies.astro,
+  react: packageJson.dependencies.react,
+  typescript: packageJson.dependencies.typescript,
+  tailwindcss: packageJson.dependencies.tailwindcss,
+  pnpm: 'pnpm',
+  node: process.version.replace('v', ''),
+}
+
+const techs: { name: string; ver: string }[] = [
+  { name: 'Astro', ver: deps.astro },
+  { name: 'React', ver: deps.react },
+  { name: 'TypeScript', ver: deps.typescript },
+  { name: 'Tailwind', ver: deps.tailwindcss },
+  { name: 'Node', ver: deps.node },
+  { name: 'pnpm', ver: '9+' },
+]
+
+const buildTime = new Date().toLocaleString('zh-CN', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+const domain = site.url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+---
+
+<div class="sidebar-card p-5">
+  <div class="sidebar-title">站点信息</div>
+
+  <div class="mb-3">
+    <div class="info-row">
+      <span class="text-secondary">构建平台</span>
+      <span class="v">Astro</span>
+    </div>
+    <div class="info-row">
+      <span class="text-secondary">博客版本</span>
+      <span class="v">v{blogVersion}</span>
+    </div>
+    <div class="info-row">
+      <span class="text-secondary">协议许可</span>
+      <span class="v">MIT</span>
+    </div>
+    <div class="info-row">
+      <span class="text-secondary">站点域名</span>
+      <span class="v">{domain}</span>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <div class="tech-grid">
+      {
+        techs.map((t) => (
+          <div class="tech-item">
+            <span>{t.name}</span>
+            <b>{t.ver.replace(/^[^0-9]*/, '')}</b>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="info-row">
+    <span class="text-secondary">构建时间</span>
+    <span class="v">{buildTime}</span>
+  </div>
+
+  <button
+    id="site-info-collapse"
+    class="mt-3 w-full cursor-pointer rounded-lg border border-primary bg-secondary/40 py-1.5 text-xs text-secondary transition-colors hover:text-accent"
+  >
+    收起
+  </button>
+</div>
+
+<script is:inline>
+  ;(function () {
+    var btn = document.getElementById('site-info-collapse')
+    if (!btn) return
+    btn.addEventListener('click', function () {
+      var card = btn.closest('.sidebar-card')
+      if (!card) return
+      var hidden = card.querySelectorAll('.info-row, .tech-grid')
+      var isHidden = hidden[0]?.getAttribute('data-collapsed') === '1'
+
+      hidden.forEach(function (el) {
+        if (isHidden) {
+          el.removeAttribute('data-collapsed')
+          el.style.display = ''
+        } else {
+          el.setAttribute('data-collapsed', '1')
+          el.style.display = 'none'
+        }
+      })
+      btn.textContent = isHidden ? '收起' : '展开'
+    })
+  })()
+</script>

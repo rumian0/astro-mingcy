@@ -1,0 +1,199 @@
+---
+// ============================================================================
+// Hero.astro —— 首页顶部个人形象展示区（「最新文章」以上）
+//
+// 结构 1:1 参考 astro-devosfera 的 index.astro HERO 区块：
+//   ① 终端提示符徽章（ping 脉冲点 + accent 前缀 + 路径 + 提示符）
+//   ② 超大标题（shimmer 流光渐变）+ RSS 图标链接
+//   ③ 一句话描述（description | bio + 固定文案）
+//   ④ Written by 作者（虚线下划线链接）+ 社交图标（border 分隔）
+//   ⑤ 右侧头像：conic-gradient 旋转光环 + 圆形头像（移动端隐藏）
+//
+// 写法按本站主题体系（不照抄参考站类名）：
+//   font-firacode → font-mono（tailwind.config 的 mono: JetBrains Mono / Fira Code）
+//   border-border → border-primary、bg-muted → bg-secondary、bg-foreground → bg-secondary
+//   text-accent / bg-accent / shadow-accent 沿用本站 rgb(var(--color-accent)) token
+//   参考站 var(--accent)/var(--foreground) → rgb(var(--color-accent))/rgb(var(--color-text-primary))
+//
+// 注意：tailwind.config 的 fontSize 仅定义到 5xl，故 6xl/7xl 用任意值
+//   （sm:text-[3.75rem] lg:text-[4.5rem]，与参考站 text-6xl/text-7xl 等值）。
+// ============================================================================
+import { hero, author, site } from '@/config.json'
+import { SocialList } from './SocialList'
+
+// 终端提示符三段（参考站 SITE.heroTerminalPrompt）
+const PROMPT_PREFIX = '~'
+const PROMPT_PATH = '/mingcy'
+const PROMPT_SUFFIX = '$'
+
+// 「Written by」跳转地址：取首个社交链接（GitHub），无则回退站点域名
+const profileUrl = hero.socials?.[0]?.url ?? site.url
+const socials = hero.socials ?? []
+---
+
+<section
+  id="hero"
+  class="hero-section relative flex min-h-[72vh] items-center pb-10 pt-14 sm:min-h-[75vh] sm:pt-16"
+>
+  <div
+    class="relative z-10 mx-auto grid w-full max-w-[950px] xl:max-w-[1100px] items-center gap-10 px-4 md:px-8 lg:grid-cols-[minmax(0,1fr)_16rem]"
+  >
+    <!-- 左：文字区 -->
+    <div class="min-w-0">
+      <!-- Terminal prompt badge -->
+      <div
+        class="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/40 bg-secondary/20 px-3.5 py-1.5 font-mono text-xs sm:text-sm"
+      >
+        <span class="relative flex h-2 w-2">
+          <span
+            class="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60"
+          ></span>
+          <span class="relative inline-flex h-2 w-2 rounded-full bg-accent"></span>
+        </span>
+        <span class="text-accent">{PROMPT_PREFIX}</span>
+        {PROMPT_PATH}
+        <span class="opacity-40">{PROMPT_SUFFIX}</span>
+      </div>
+
+      <!-- Title -->
+      <h1
+        class="hero-title mb-3 text-5xl font-bold leading-[1.1] tracking-tight sm:text-[3.75rem] lg:text-[4.5rem]"
+      >
+        {hero.name}
+        <a
+          target="_blank"
+          href="/rss.xml"
+          class="ml-1 inline-block align-middle"
+          aria-label="RSS Feed"
+          title="RSS Feed"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="stroke-accent stroke-3 opacity-40 transition-opacity duration-300 hover:opacity-100"
+            aria-hidden="true"
+          >
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+            <path d="M5 19m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path>
+            <path d="M4 4a16 16 0 0 1 16 16"></path>
+            <path d="M4 11a9 9 0 0 1 9 9"></path>
+          </svg>
+        </a>
+      </h1>
+
+      <!-- Description -->
+      <p class="mt-7 max-w-2xl text-base leading-relaxed opacity-75 sm:text-lg">
+        {hero.description} | {hero.bio}记录编程、网络安全与生活的点滴。
+      </p>
+      <div class="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
+        <p class="flex-shrink-0 text-sm opacity-50">
+          Written by
+          <a
+            class="font-medium underline decoration-dashed underline-offset-4 hover:text-accent"
+            href={profileUrl}
+            target="_blank"
+            rel="noopener noreferrer">{author.name}</a
+          >
+        </p>
+
+        {
+          socials.length > 0 && (
+            <div class="border-primary/40 sm:border-l sm:pl-4">
+              <SocialList client:load />
+            </div>
+          )
+        }
+      </div>
+    </div>
+
+    <!-- 右：头像（独立于侧边栏，移动端隐藏） -->
+    <div class="hero-avatar hidden lg:block">
+      <div class="relative mx-auto size-48 xl:size-64">
+        <div class="hero-avatar-ring" aria-hidden="true"></div>
+        <div
+          class="relative size-full overflow-hidden rounded-full border border-primary/40 bg-secondary/5 shadow-2xl shadow-accent/10"
+        >
+          <img
+            src={author.avatar}
+            alt={author.name}
+            class="size-full object-cover"
+            loading="eager"
+            decoding="async"
+            referrerpolicy="no-referrer"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* ── Hero title shimmer（与参考站一致的流光渐变，颜色走本站 token）── */
+  .hero-title {
+    background: linear-gradient(
+      135deg,
+      rgb(var(--color-accent)) 0%,
+      color-mix(in oklab, rgb(var(--color-accent)) 50%, rgb(var(--color-text-primary))) 20%,
+      rgb(var(--color-text-primary)) 35%,
+      rgb(var(--color-text-primary)) 65%,
+      color-mix(in oklab, rgb(var(--color-accent)) 50%, rgb(var(--color-text-primary))) 80%,
+      rgb(var(--color-accent)) 100%
+    );
+    background-size: 250% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: hero-shimmer 6s ease-in-out infinite;
+  }
+
+  @keyframes hero-shimmer {
+    0%,
+    100% {
+      background-position: 0% center;
+    }
+    50% {
+      background-position: 100% center;
+    }
+  }
+
+  /* ── Hero 头像光环：conic-gradient 缺口渐变 + 缓慢旋转 ── */
+  .hero-avatar-ring {
+    position: absolute;
+    inset: -0.55rem;
+    border-radius: 999px;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg 200deg,
+      color-mix(in oklab, rgb(var(--color-accent)) 60%, transparent) 300deg,
+      transparent 360deg
+    );
+    animation: hero-avatar-ring-spin 9s linear infinite;
+    pointer-events: none;
+    opacity: 0.7;
+    transition: opacity 0.3s;
+  }
+  .hero-avatar:hover .hero-avatar-ring {
+    opacity: 1;
+  }
+
+  @keyframes hero-avatar-ring-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-title {
+      animation: none;
+    }
+    .hero-avatar-ring {
+      animation: none;
+    }
+  }
+</style>

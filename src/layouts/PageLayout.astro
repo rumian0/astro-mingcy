@@ -1,0 +1,27 @@
+---
+import Layout from './Layout.astro'
+import Navbar from '@/components/header/Navbar.astro'
+import Footer from '@/components/footer/Footer.astro'
+import { Provider } from '@/components/provider/Provider'
+
+interface Props {
+  title?: string
+  description?: string
+  image?: string
+  transparentBg?: boolean
+}
+
+const { title, description, image, transparentBg = false } = Astro.props
+---
+
+<Layout title={title} description={description} image={image}>
+  <Provider pathName={Astro.url.pathname} client:only="react" />
+
+  <Navbar />
+  <main class={`relative z-1 pt-16 min-h-main ${transparentBg ? 'page-bg-home' : 'bg-primary/25'}`}>
+    <div class="swup-transition-fade">
+      <slot />
+    </div>
+  </main>
+  <Footer />
+</Layout>

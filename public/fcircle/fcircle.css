@@ -1,0 +1,990 @@
+/* ══════════════════════════════════════════════════════════════
+   友圈（Friend-Circle-Lite）自包含样式 —— 提取自 https://your-site.example.com/links/fcircle
+   ────────────────────────────────────────────────────────────────
+   段① 主题变量兜底（来自 src/config.json color 段，与 AccentColorInjector
+       注入的默认值逐位一致；fcircle.js 的随机 accent 注入会覆盖它们）
+   段② 页面基座 + Tailwind 工具类等价规则（新站无 Tailwind 也能复现布局）
+   段③ fclite 插件基座（public/fclite/fclite.css 原样，仅把 [data-theme='light']
+       变量映射并入 :root，避免无 data-theme 属性时变量 undefined）
+   段④ fcircle.astro 的 <style is:global> 原样（主题化覆盖 + 状态区 + 响应式）
+   ══════════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────
+   ① 主题变量兜底
+─────────────────────────────────────────── */
+:root {
+  --color-accent: 245 85 85;
+  --color-bg-root: 242 237 228;
+  --color-bg-primary: 242 245 236;
+  --color-bg-secondary: 233 237 219;
+  --color-text-primary: 51 55 58;
+  --color-text-secondary: 95 107 90;
+  --color-border-primary: 213 220 198;
+}
+[data-theme='dark'] {
+  --color-accent: 50 94 163;
+  --color-bg-root: 6 13 35;
+  --color-bg-primary: 16 19 26;
+  --color-bg-secondary: 26 33 49;
+  --color-text-primary: 246 247 248;
+  --color-text-secondary: 169 180 201;
+  --color-border-primary: 46 59 89;
+}
+
+/* ───────────────────────────────────────────
+   ② 页面基座 + Tailwind 工具类等价
+   （对应 DOM：class="fcircle-wrap mx-auto max-w-[1100px] px-4 md:px-8 py-10"）
+   刻意不动 html 的 font/background —— 避免覆盖新站整站样式
+─────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+.fcircle-wrap {
+  max-width: 1100px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 2.5rem 1rem;
+  font-family:
+    'Noto Sans SC', 'Source Han Sans SC', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
+  color: rgb(var(--color-text-primary));
+}
+@media (min-width: 768px) {
+  .fcircle-wrap {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* ───────────────────────────────────────────
+   ③ fclite 插件基座
+   来源：public/fclite/fclite.css
+   来源仓库：https://github.com/willow-god/Friend-Circle-Lite main/fclite.css
+   精简说明：
+   · 仅保留布局/结构/动画（颜色统一由段④的主题覆盖接管，全部使用站点 CSS 变量）
+   · #friend-circle-lite-root .card-bg 尺寸定稿为 100×100px
+   · 移除 sourcemap 注释
+   · [data-theme='light'] 变量映射并入 :root（新站无 data-theme 时的兜底）
+─────────────────────────────────────────── */
+:root {
+  --text-color-light: #000000;
+  --text-color-dark: #f7f7fa;
+  --background-color-light: #f4f4f9;
+  --background-color-dark: #181818;
+  --container-bg-color-light: white;
+  --container-bg-color-dark: #1d1e22;
+  --hover-color: #3498db;
+  --author-color-light: gray;
+  --author-color-dark: #b3b3b3;
+  --modal-bg-blur: 25px;
+  --shadow-color-light: rgba(0, 0, 0, 0.1);
+  --shadow-color-dark: rgba(255, 255, 255, 0.1);
+  --border-color-light: #e3e8f7;
+  --border-color-dark: #42444a;
+}
+:root,
+[data-theme='light'] {
+  --text-color: var(--text-color-light);
+  --background-color: var(--background-color-light);
+  --tag-bg-color: #bfbfbf;
+  --container-bg-color: var(--container-bg-color-light);
+  --author-color: var(--author-color-light);
+  --shadow-color: var(--shadow-color-light);
+  --border-color: var(--border-color-light);
+  --modal-bg-color: rgba(255, 255, 255, 0.5);
+  --modal-content-bg-color: rgba(239, 250, 255, 0.5);
+  --load-more-btn-bg-color: var(--container-bg-color);
+}
+[data-theme='dark'] {
+  --text-color: var(--text-color-dark);
+  --background-color: var(--background-color-dark);
+  --tag-bg-color: #474747;
+  --container-bg-color: var(--container-bg-color-dark);
+  --author-color: var(--author-color-dark);
+  --shadow-color: var(--shadow-color-dark);
+  --border-color: var(--border-color-dark);
+  --modal-bg-color: rgba(0, 0, 0, 0.3);
+  --modal-content-bg-color: rgba(20, 20, 20, 0.5);
+  --load-more-btn-bg-color: var(--container-bg-color);
+}
+
+#friend-circle-lite-root {
+  width: 100%;
+}
+
+/* ── 随机文章区布局 ── */
+#random-article {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  width: 100%;
+  margin: 0 0 16px 0;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.random-top {
+  width: 100%;
+}
+.random-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.stat-item {
+  text-align: center;
+  transition: all 0.3s ease;
+}
+.stat-num {
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-text {
+  text-transform: uppercase;
+}
+.random-content {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+.random-container {
+  flex: 1;
+  min-width: 0;
+}
+.random-container-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.random-title {
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.random-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+}
+.random-author,
+.random-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.3s ease;
+}
+.random-button-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
+}
+@media screen and (max-width: 768px) {
+  .random-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media screen and (max-width: 600px) {
+  .random-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  .random-container {
+    text-align: center;
+  }
+  .random-meta {
+    justify-content: center;
+  }
+  .random-button-container {
+    justify-content: center;
+    width: 100%;
+  }
+}
+@media screen and (max-width: 400px) {
+  .random-stats {
+    gap: 8px;
+  }
+  .stat-item {
+    padding: 10px 8px;
+  }
+}
+
+/* ── 加载 / 错误占位 ── */
+.error-placeholder,
+.loading-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 12px;
+}
+.loading-spinner {
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.error-icon {
+  font-size: 48px;
+}
+.retry-button {
+  margin-top: 8px;
+}
+
+/* ── 弹窗布局 ── */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--modal-bg-color);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s ease-in-out,
+    visibility 0.3s ease-in-out;
+}
+.modal-open {
+  opacity: 1;
+  visibility: visible;
+}
+.modal-content {
+  opacity: 0;
+  position: relative;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(-50px);
+  width: 350px;
+  padding: 20px;
+  z-index: 1000;
+  max-height: 90%;
+  overflow: hidden;
+  transition:
+    transform 0.3s ease-in-out,
+    opacity 0.3s ease-in-out;
+}
+.modal.modal-open .modal-content {
+  transform: translate(-50%, -50%) translateY(0);
+  opacity: 1;
+}
+.modal-content:hover #modal-bg {
+  transform: scale(1.1);
+}
+@media screen and (max-width: 440px) {
+  .modal-content {
+    width: 80%;
+  }
+}
+#modal-bg {
+  position: absolute;
+  filter: blur(5px);
+  opacity: 0.2;
+  z-index: 0;
+  border-radius: 125px 125px 12px 125px !important;
+  margin: 0 !important;
+  width: 250px;
+  height: 250px;
+  right: -20px;
+  bottom: -20px;
+  object-fit: cover;
+  transition: transform 0.6s ease !important;
+}
+#modal-author-avatar {
+  display: block;
+  margin: 5px auto !important;
+  border-radius: 50% !important;
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+}
+#modal-author-name-link {
+  display: block;
+  text-align: center;
+  font-size: 15px;
+  margin: 15px 0;
+  text-decoration: none;
+}
+#modal-author-name-link:hover {
+  text-decoration: underline;
+}
+.modal-content hr {
+  margin: 20px 0;
+}
+#modal-articles-container {
+  position: relative;
+  z-index: 1;
+  border-top: var(--hover-color) double 2px;
+  margin-top: 20px;
+  padding-top: 10px;
+}
+.modal-article {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+.modal-article .modal-article-title {
+  font-size: 18px;
+  line-height: 1.2;
+  cursor: pointer;
+  max-height: 2.5em;
+  width: 100%;
+  margin-bottom: 5px;
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.modal-article .modal-article-date {
+  font-size: 12px;
+  width: 100%;
+  padding: 5px;
+  cursor: default;
+  text-align: right;
+}
+
+/* ── 文章卡片布局 ── */
+.articles-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+.card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.card-title {
+  cursor: pointer;
+  max-height: 4.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.card-author {
+  cursor: pointer;
+  display: flex;
+  width: fit-content;
+  align-items: center;
+}
+#friend-circle-lite-root .card-author img {
+  margin: 0 2px !important;
+}
+.card-date {
+  position: absolute;
+  z-index: 1;
+  bottom: 10px;
+  cursor: default;
+  right: 10px;
+  display: flex;
+  align-items: center;
+}
+
+/* ── 卡片右下角背景图（定稿 100×100px）── */
+#friend-circle-lite-root .card-bg {
+  cursor: default;
+  z-index: 0;
+  border-radius: 50% !important;
+  margin: 0 !important;
+  position: absolute;
+  bottom: -12px;
+  right: -12px;
+  width: 100px;
+  height: 100px;
+  opacity: 0.15;
+  object-fit: cover;
+  transition:
+    transform 0.6s ease,
+    opacity 0.4s ease;
+}
+#friend-circle-lite-root .card:hover .card-bg {
+  transform: scale(1.1);
+  opacity: 0.3;
+}
+
+/* ── 统计区（仅保留更新时间，版权行已在本地 JS 中移除） ── */
+#stats-container > * {
+  margin-bottom: 3px;
+}
+
+/* ───────────────────────────────────────────
+   ④ 页面主题化覆盖（fcircle.astro <style is:global> 原样）
+─────────────────────────────────────────── */
+.feed-section {
+  margin-bottom: 2.5rem;
+}
+
+.status-section {
+  padding: 1.75rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgb(var(--color-border-primary));
+  background: rgb(var(--color-bg-secondary) / 0.3);
+}
+.status-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.status-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+  color: rgb(var(--color-text-primary));
+}
+.status-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: rgb(var(--color-accent));
+  opacity: 0.7;
+}
+.status-summary {
+  font-size: 0.8rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  opacity: 0.6;
+  color: rgb(var(--color-text-secondary));
+}
+.stat-ok {
+  color: #22c55e;
+}
+.stat-fail {
+  color: #ef4444;
+}
+.stat-sep {
+  opacity: 0.3;
+}
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.5rem;
+}
+.status-card {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  font-size: 0.82rem;
+  border: 1px solid rgb(var(--color-border-primary));
+  background: rgb(var(--color-bg-secondary) / 0.4);
+  transition: all 0.25s ease;
+}
+.status-card:hover {
+  transform: translateY(-2px);
+}
+.status-card.ok:hover {
+  border-color: rgb(from #22c55e r g b / 0.3);
+  background: rgb(from #22c55e r g b / 0.04);
+  box-shadow: 0 4px 16px rgb(from #22c55e r g b / 0.08);
+}
+.status-card.fail:hover {
+  border-color: rgb(from #ef4444 r g b / 0.3);
+  background: rgb(from #ef4444 r g b / 0.04);
+  box-shadow: 0 4px 16px rgb(from #ef4444 r g b / 0.08);
+}
+.sc-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-card.ok .sc-indicator {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgb(from #22c55e r g b / 0.5);
+}
+.status-card.fail .sc-indicator {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgb(from #ef4444 r g b / 0.5);
+}
+.sc-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(var(--color-text-primary));
+}
+.sc-label {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+.status-card.ok .sc-label {
+  color: #22c55e;
+  background: rgb(from #22c55e r g b / 0.12);
+}
+.status-card.fail .sc-label {
+  color: #ef4444;
+  background: rgb(from #ef4444 r g b / 0.12);
+}
+.status-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 2rem;
+  color: rgb(var(--color-text-secondary));
+  opacity: 0.5;
+  font-size: 0.9rem;
+}
+
+#friend-circle-lite-root {
+  --hover-color: rgb(var(--color-accent));
+  --author-color-light: rgb(var(--color-text-primary));
+  --author-color-dark: rgb(var(--color-text-primary));
+  --shadow-color-light: rgb(var(--color-text-primary));
+  --shadow-color-dark: rgb(var(--color-text-primary));
+  --border-color-light: rgb(var(--color-border-primary));
+  --border-color-dark: rgb(var(--color-border-primary));
+  --text-color: rgb(var(--color-text-primary));
+  --background-color: transparent;
+  --container-bg-color: transparent;
+  --tag-bg-color: transparent;
+}
+
+/* ── 随机文章卡 ── */
+#friend-circle-lite-root #random-article {
+  background: rgb(var(--color-accent) / 0.04);
+  border: 1px solid rgb(var(--color-accent) / 0.14);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgb(var(--color-text-primary) / 0.02);
+}
+#friend-circle-lite-root #random-article:hover {
+  border-color: rgb(var(--color-accent) / 0.28);
+  box-shadow: 0 4px 20px rgb(var(--color-accent) / 0.08);
+}
+#friend-circle-lite-root .random-stats {
+  gap: 0.6rem;
+}
+#friend-circle-lite-root .stat-item {
+  background: rgb(var(--color-bg-secondary) / 0.45);
+  border: 1px solid rgb(var(--color-accent) / 0.1);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.5rem;
+}
+#friend-circle-lite-root .stat-item:hover {
+  border-color: rgb(var(--color-accent) / 0.35);
+  transform: translateY(-1px);
+}
+#friend-circle-lite-root .stat-num {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: rgb(var(--color-accent));
+}
+#friend-circle-lite-root .stat-text {
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  color: rgb(var(--color-text-secondary));
+}
+#friend-circle-lite-root .random-container-title {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  color: rgb(var(--color-text-secondary));
+  opacity: 0.6;
+}
+#friend-circle-lite-root .random-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: rgb(var(--color-text-primary));
+  line-height: 1.4;
+}
+#friend-circle-lite-root .random-title:hover {
+  color: rgb(var(--color-accent));
+}
+#friend-circle-lite-root .random-author,
+#friend-circle-lite-root .random-date {
+  background: rgb(var(--color-bg-secondary) / 0.5);
+  border: 1px solid rgb(var(--color-border-primary));
+  color: rgb(var(--color-text-secondary));
+  border-radius: 999px;
+  font-size: 0.72rem;
+  padding: 0.25rem 0.7rem;
+}
+#friend-circle-lite-root .random-author:hover {
+  border-color: rgb(var(--color-accent) / 0.25);
+  color: rgb(var(--color-text-primary));
+}
+#friend-circle-lite-root .random-button-container a {
+  color: rgb(var(--color-text-primary));
+  background: rgb(var(--color-bg-secondary) / 0.5);
+  border: 1px solid rgb(var(--color-border-primary));
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  padding: 0.45rem 1rem;
+  transition: all 0.25s ease;
+}
+#friend-circle-lite-root .random-button-container a:hover {
+  border-color: rgb(var(--color-accent));
+  color: rgb(var(--color-accent));
+  background: rgb(var(--color-accent) / 0.06);
+}
+#friend-circle-lite-root .random-link-button {
+  background: rgb(var(--color-accent) / 0.1);
+  color: rgb(var(--color-accent));
+  border: 1px solid rgb(var(--color-accent) / 0.18);
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  padding: 0.45rem 1.2rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+#friend-circle-lite-root .random-link-button:hover {
+  background: rgb(var(--color-accent) / 0.18);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgb(var(--color-accent) / 0.12);
+}
+
+/* ── 文章卡片 ── */
+#friend-circle-lite-root .articles-container {
+  gap: 0.85rem;
+}
+#friend-circle-lite-root .card {
+  position: relative;
+  background: rgb(var(--color-bg-secondary) / 0.5);
+  border: 1px solid rgb(var(--color-border-primary));
+  border-radius: 1rem;
+  padding: 1.15rem 1.1rem;
+  height: auto;
+  min-height: 120px;
+  box-shadow: 0 1px 2px rgb(var(--color-text-primary) / 0.02);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  flex-direction: column;
+}
+#friend-circle-lite-root .card:hover {
+  border-color: rgb(var(--color-accent) / 0.35);
+  transform: translateY(-4px);
+  box-shadow:
+    0 8px 30px rgb(var(--color-accent) / 0.1),
+    0 1px 3px rgb(var(--color-text-primary) / 0.02);
+}
+#friend-circle-lite-root .card-title {
+  color: rgb(var(--color-text-primary));
+  font-size: 0.92rem;
+  font-weight: 650;
+  line-height: 1.55;
+  margin-bottom: 0.6rem;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: pointer;
+}
+#friend-circle-lite-root .card-title:hover {
+  color: rgb(var(--color-accent));
+}
+#friend-circle-lite-root .card-author {
+  background: rgb(var(--color-bg-secondary) / 0.55);
+  border: 1px solid rgb(var(--color-border-primary));
+  color: rgb(var(--color-text-secondary));
+  border-radius: 999px;
+  font-size: 0.7rem;
+  padding: 0.18rem 0.55rem 0.18rem 0.18rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: fit-content;
+}
+#friend-circle-lite-root .card-author:hover {
+  color: rgb(var(--color-text-primary));
+  border-color: rgb(var(--color-accent) / 0.2);
+}
+#friend-circle-lite-root .card-author img {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+#friend-circle-lite-root .card-date {
+  color: rgb(var(--color-text-secondary));
+  opacity: 0.6;
+  font-size: 0.68rem;
+  position: absolute;
+  bottom: 0.7rem;
+  right: 0.9rem;
+}
+#friend-circle-lite-root .card-title,
+#friend-circle-lite-root .card-author {
+  position: relative;
+  z-index: 1;
+}
+/* .card-bg 已由段③定稿为 100×100px */
+
+/* ── 加载更多按钮 ── */
+#friend-circle-lite-root #load-more-btn {
+  color: rgb(var(--color-text-primary));
+  background: rgb(var(--color-bg-secondary) / 0.5);
+  border: 1px solid rgb(var(--color-border-primary));
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.55rem 2rem;
+  width: auto;
+  min-width: 140px;
+  margin: 1.5rem auto 1rem;
+  display: block;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+#friend-circle-lite-root #load-more-btn:hover {
+  background: rgb(var(--color-accent));
+  border-color: rgb(var(--color-accent));
+  color: #fff;
+  min-width: 160px;
+  box-shadow: 0 4px 20px rgb(var(--color-accent) / 0.2);
+}
+
+/* ── 统计区（仅保留更新时间）── */
+#friend-circle-lite-root #stats-container {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: rgb(var(--color-text-secondary));
+  opacity: 0.55;
+}
+
+/* ── 弹窗 ── */
+#friend-circle-lite-root .modal {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+#friend-circle-lite-root .modal-content {
+  background: rgb(var(--color-bg-primary) / 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgb(var(--color-border-primary));
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 60px rgb(var(--color-text-primary) / 0.08);
+}
+#friend-circle-lite-root .modal-content hr {
+  border-color: rgb(var(--color-border-primary));
+}
+#friend-circle-lite-root .modal-article {
+  border-bottom-color: rgb(var(--color-border-primary));
+}
+#friend-circle-lite-root .modal-article .modal-article-title {
+  color: rgb(var(--color-text-primary));
+  font-weight: 600;
+  transition: color 0.2s;
+}
+#friend-circle-lite-root .modal-article .modal-article-title:hover {
+  color: rgb(var(--color-accent));
+}
+#friend-circle-lite-root .modal-article .modal-article-date {
+  color: rgb(var(--color-text-secondary));
+  opacity: 0.7;
+  font-size: 0.72rem;
+}
+#friend-circle-lite-root #modal-author-name-link {
+  color: rgb(var(--color-accent));
+  font-weight: 600;
+}
+
+/* ── 加载 / 错误状态 ── */
+#friend-circle-lite-root .loading-spinner {
+  border-color: rgb(var(--color-border-primary));
+  border-top-color: rgb(var(--color-accent));
+  border-width: 3px;
+  width: 36px;
+  height: 36px;
+}
+#friend-circle-lite-root .loading-text,
+#friend-circle-lite-root .error-text {
+  color: rgb(var(--color-text-secondary));
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
+#friend-circle-lite-root .retry-button {
+  background: rgb(var(--color-accent) / 0.1);
+  color: rgb(var(--color-accent));
+  border: 1px solid rgb(var(--color-accent) / 0.18);
+  border-radius: 0.5rem;
+  padding: 0.4rem 1.2rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+#friend-circle-lite-root .retry-button:hover {
+  background: rgb(var(--color-accent) / 0.18);
+}
+
+/* ── 卡片入场动画 ── */
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+#friend-circle-lite-root .card {
+  animation: cardFadeIn 0.4s ease forwards;
+}
+
+/* ── 响应式 ── */
+@media (max-width: 640px) {
+  .status-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .status-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   移动端卡片横向溢出修复（只影响 ≤768px；PC 端一条样式都不改）
+   根因：fclite.css 的 .articles-container 用 repeat(auto-fill, minmax(220px, 1fr))，
+         220px 是网格轨道的【硬下限】—— 容器比 220px 窄时轨道不收缩，
+         整片卡片墙直接撑出视口 → 页面出现横向滚动条。
+   修法：minmax(0, 1fr)（允许轨道收缩到 0）+ 全链路 min-width: 0，
+         让每一层都能跟着视口收缩；外层再 clip 一道兜底。
+   注意：只用 overflow-x: clip（不产生滚动容器、不裁纵向），
+         .card:hover 的 translateY 悬浮效果在纵向不受影响。
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* 页面外层：自身不产生横向滚动条 */
+  .fcircle-wrap {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  /* 插件挂载点 */
+  #friend-circle-lite-root {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  /* 卡片墙（核心修复）：单列 + 可收缩轨道 */
+  #friend-circle-lite-root .articles-container {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0.7rem !important;
+    width: 100% !important;
+  }
+
+  /* 单张卡片：允许收缩，内部裁切兜底；窄屏压内边距（桌面端 1.15/1.1rem 不变），
+     单列后每张卡少浪费 ~18px 横向空间，长标题/作者名不再被挤到贴边 */
+  #friend-circle-lite-root .card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0.8rem 0.85rem;
+  }
+  #friend-circle-lite-root .card-title {
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* 作者药丸：桌面端是 width:fit-content + 无 overflow，长作者名会把药丸撑出卡片。
+     移动端限宽 + 裁切（文字超出部分直接不显示，不留溢出） */
+  #friend-circle-lite-root .card-author {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  #friend-circle-lite-root .card-date {
+    max-width: calc(100% - 1rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 随机文章区：统计格 2 列 + 内容可收缩 */
+  #friend-circle-lite-root #random-article {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 1.1rem;
+    box-sizing: border-box;
+  }
+  /* 提前到 768px 改竖排（插件自己要到 ≤600px 才改）：
+     横排时 .random-button-container 是 flex-shrink:0，标题 + 按钮行会互挤，
+     601–768px 这段区间最容易横着撑出去 */
+  #friend-circle-lite-root .random-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.9rem;
+  }
+  #friend-circle-lite-root .random-button-container {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+  #friend-circle-lite-root .random-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.6rem !important;
+  }
+  #friend-circle-lite-root .random-container,
+  #friend-circle-lite-root .random-meta,
+  #friend-circle-lite-root .random-author,
+  #friend-circle-lite-root .random-date {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* 加载更多按钮：不再固定最小宽度 */
+  #friend-circle-lite-root #load-more-btn {
+    min-width: 0;
+    max-width: 100%;
+    padding: 0.55rem 1.5rem;
+  }
+
+  /* 友链状态卡：沿用 640px 断点的两列，但轨道允许收缩 */
+  .status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* 网格项默认 min-width:auto（= min-content），这里显式归零兜底 */
+  .status-card {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .status-section {
+    padding: 1.1rem;
+    max-width: 100%;
+  }
+}
+
+/* 减弱动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+  #friend-circle-lite-root .card {
+    animation: none !important;
+  }
+}

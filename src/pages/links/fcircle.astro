@@ -1,0 +1,624 @@
+---
+import PageLayout from '@/layouts/PageLayout.astro'
+
+const title = '友圈'
+---
+
+<!--
+  朋友圈（Friend-Circle-Lite 直嵌版，参考 astro-devosfera/src/pages/links/circle.astro 定制）
+  ─────────────────────────────────────────────────────────────
+  · 全部颜色走主题 CSS 变量（--color-accent / --color-bg-* / --color-text-* / --color-border-*），
+    插件 CSS 本身用 [data-theme=light/dark] 选择器 —— html[data-theme] 由站点主题系统维护，
+    切换黑白模式时本页自动跟随，无需在页面内单独切换。
+  · 插件初始化（fclite.js 加载 + 友链状态拉取）由 Layout.astro 的 body 级常驻脚本统一处理，
+    兼容 Swup 切页（main 内 inline 脚本在切页后不会重新执行，见 2026-08-18 修复记录）。
+-->
+<PageLayout title={title}>
+  <div class="fcircle-wrap mx-auto max-w-[1100px] px-4 md:px-8 py-10">
+    <!-- ═══ 动态流：Friend-Circle-Lite 挂载点 ═══ -->
+    <section class="feed-section">
+      <div id="friend-circle-lite-root"></div>
+    </section>
+
+    <!-- ═══ 友链状态 ═══ -->
+    <section class="status-section">
+      <div class="status-head">
+        <h2 class="status-title">
+          <svg
+            class="status-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            ><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline
+              points="22 4 12 14.01 9 11.01"></polyline></svg
+          >
+          友链状态
+        </h2>
+        <span id="links-summary" class="status-summary">加载中…</span>
+      </div>
+      <div id="links-grid" class="status-grid"></div>
+    </section>
+  </div>
+</PageLayout>
+
+<!-- 插件样式 /fclite/fclite.css 已由 Layout.astro head 全局加载（Swup 切页不替换 head，样式始终可用） -->
+
+<!-- 初次整页加载：静态引用让浏览器尽早并行下载插件脚本（Swup 切页时由 Layout 常驻脚本兜底加载） -->
+<script is:inline>
+  window.UserConfig = window.UserConfig || {
+    private_api_url: 'https://your-fcircle-api.example.com/',
+    page_turning_number: 24,
+    error_img: '/fclite/avatar-fallback.svg',
+  }
+</script>
+
+<script is:inline src="/fclite/fclite.js"></script>
+
+<style is:global>
+  /* ═══════════════════════════════════════
+     FEED / STATUS 区块
+  ═══════════════════════════════════════ */
+  .feed-section {
+    margin-bottom: 2.5rem;
+  }
+
+  .status-section {
+    padding: 1.75rem;
+    border-radius: 1.25rem;
+    border: 1px solid rgb(var(--color-border-primary));
+    background: rgb(var(--color-bg-secondary) / 0.3);
+  }
+  .status-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .status-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0;
+    color: rgb(var(--color-text-primary));
+  }
+  .status-icon {
+    width: 1.1rem;
+    height: 1.1rem;
+    color: rgb(var(--color-accent));
+    opacity: 0.7;
+  }
+  .status-summary {
+    font-size: 0.8rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    opacity: 0.6;
+    color: rgb(var(--color-text-secondary));
+  }
+  .stat-ok {
+    color: #22c55e;
+  }
+  .stat-fail {
+    color: #ef4444;
+  }
+  .stat-sep {
+    opacity: 0.3;
+  }
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.5rem;
+  }
+  .status-card {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.75rem;
+    text-decoration: none;
+    font-size: 0.82rem;
+    border: 1px solid rgb(var(--color-border-primary));
+    background: rgb(var(--color-bg-secondary) / 0.4);
+    transition: all 0.25s ease;
+  }
+  .status-card:hover {
+    transform: translateY(-2px);
+  }
+  .status-card.ok:hover {
+    border-color: rgb(from #22c55e r g b / 0.3);
+    background: rgb(from #22c55e r g b / 0.04);
+    box-shadow: 0 4px 16px rgb(from #22c55e r g b / 0.08);
+  }
+  .status-card.fail:hover {
+    border-color: rgb(from #ef4444 r g b / 0.3);
+    background: rgb(from #ef4444 r g b / 0.04);
+    box-shadow: 0 4px 16px rgb(from #ef4444 r g b / 0.08);
+  }
+  .sc-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-card.ok .sc-indicator {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgb(from #22c55e r g b / 0.5);
+  }
+  .status-card.fail .sc-indicator {
+    background: #ef4444;
+    box-shadow: 0 0 6px rgb(from #ef4444 r g b / 0.5);
+  }
+  .sc-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgb(var(--color-text-primary));
+  }
+  .sc-label {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+  }
+  .status-card.ok .sc-label {
+    color: #22c55e;
+    background: rgb(from #22c55e r g b / 0.12);
+  }
+  .status-card.fail .sc-label {
+    color: #ef4444;
+    background: rgb(from #ef4444 r g b / 0.12);
+  }
+  .status-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    color: rgb(var(--color-text-secondary));
+    opacity: 0.5;
+    font-size: 0.9rem;
+  }
+
+  /* ═══════════════════════════════════════
+     Friend-Circle-Lite 插件 DOM 主题化（全局）
+     全部使用主题 CSS 变量 → 跟随黑白模式
+  ═══════════════════════════════════════ */
+  #friend-circle-lite-root {
+    --hover-color: rgb(var(--color-accent));
+    --author-color-light: rgb(var(--color-text-primary));
+    --author-color-dark: rgb(var(--color-text-primary));
+    --shadow-color-light: rgb(var(--color-text-primary));
+    --shadow-color-dark: rgb(var(--color-text-primary));
+    --border-color-light: rgb(var(--color-border-primary));
+    --border-color-dark: rgb(var(--color-border-primary));
+    --text-color: rgb(var(--color-text-primary));
+    --background-color: transparent;
+    --container-bg-color: transparent;
+    --tag-bg-color: transparent;
+  }
+
+  /* ── 随机文章卡 ── */
+  #friend-circle-lite-root #random-article {
+    background: rgb(var(--color-accent) / 0.04);
+    border: 1px solid rgb(var(--color-accent) / 0.14);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgb(var(--color-text-primary) / 0.02);
+  }
+  #friend-circle-lite-root #random-article:hover {
+    border-color: rgb(var(--color-accent) / 0.28);
+    box-shadow: 0 4px 20px rgb(var(--color-accent) / 0.08);
+  }
+  #friend-circle-lite-root .random-stats {
+    gap: 0.6rem;
+  }
+  #friend-circle-lite-root .stat-item {
+    background: rgb(var(--color-bg-secondary) / 0.45);
+    border: 1px solid rgb(var(--color-accent) / 0.1);
+    border-radius: 0.75rem;
+    padding: 0.7rem 0.5rem;
+  }
+  #friend-circle-lite-root .stat-item:hover {
+    border-color: rgb(var(--color-accent) / 0.35);
+    transform: translateY(-1px);
+  }
+  #friend-circle-lite-root .stat-num {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: rgb(var(--color-accent));
+  }
+  #friend-circle-lite-root .stat-text {
+    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+    color: rgb(var(--color-text-secondary));
+  }
+  #friend-circle-lite-root .random-container-title {
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    color: rgb(var(--color-text-secondary));
+    opacity: 0.6;
+  }
+  #friend-circle-lite-root .random-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: rgb(var(--color-text-primary));
+    line-height: 1.4;
+  }
+  #friend-circle-lite-root .random-title:hover {
+    color: rgb(var(--color-accent));
+  }
+  #friend-circle-lite-root .random-author,
+  #friend-circle-lite-root .random-date {
+    background: rgb(var(--color-bg-secondary) / 0.5);
+    border: 1px solid rgb(var(--color-border-primary));
+    color: rgb(var(--color-text-secondary));
+    border-radius: 999px;
+    font-size: 0.72rem;
+    padding: 0.25rem 0.7rem;
+  }
+  #friend-circle-lite-root .random-author:hover {
+    border-color: rgb(var(--color-accent) / 0.25);
+    color: rgb(var(--color-text-primary));
+  }
+  #friend-circle-lite-root .random-button-container a {
+    color: rgb(var(--color-text-primary));
+    background: rgb(var(--color-bg-secondary) / 0.5);
+    border: 1px solid rgb(var(--color-border-primary));
+    border-radius: 0.5rem;
+    font-size: 0.78rem;
+    padding: 0.45rem 1rem;
+    transition: all 0.25s ease;
+  }
+  #friend-circle-lite-root .random-button-container a:hover {
+    border-color: rgb(var(--color-accent));
+    color: rgb(var(--color-accent));
+    background: rgb(var(--color-accent) / 0.06);
+  }
+  #friend-circle-lite-root .random-link-button {
+    background: rgb(var(--color-accent) / 0.1);
+    color: rgb(var(--color-accent));
+    border: 1px solid rgb(var(--color-accent) / 0.18);
+    border-radius: 0.5rem;
+    font-size: 0.78rem;
+    padding: 0.45rem 1.2rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  #friend-circle-lite-root .random-link-button:hover {
+    background: rgb(var(--color-accent) / 0.18);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgb(var(--color-accent) / 0.12);
+  }
+
+  /* ── 文章卡片 ── */
+  #friend-circle-lite-root .articles-container {
+    gap: 0.85rem;
+  }
+  #friend-circle-lite-root .card {
+    position: relative;
+    background: rgb(var(--color-bg-secondary) / 0.5);
+    border: 1px solid rgb(var(--color-border-primary));
+    border-radius: 1rem;
+    padding: 1.15rem 1.1rem;
+    height: auto;
+    min-height: 120px;
+    box-shadow: 0 1px 2px rgb(var(--color-text-primary) / 0.02);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    display: flex;
+    flex-direction: column;
+  }
+  #friend-circle-lite-root .card:hover {
+    border-color: rgb(var(--color-accent) / 0.35);
+    transform: translateY(-4px);
+    box-shadow:
+      0 8px 30px rgb(var(--color-accent) / 0.1),
+      0 1px 3px rgb(var(--color-text-primary) / 0.02);
+  }
+  #friend-circle-lite-root .card-title {
+    color: rgb(var(--color-text-primary));
+    font-size: 0.92rem;
+    font-weight: 650;
+    line-height: 1.55;
+    margin-bottom: 0.6rem;
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  #friend-circle-lite-root .card-title:hover {
+    color: rgb(var(--color-accent));
+  }
+  #friend-circle-lite-root .card-author {
+    background: rgb(var(--color-bg-secondary) / 0.55);
+    border: 1px solid rgb(var(--color-border-primary));
+    color: rgb(var(--color-text-secondary));
+    border-radius: 999px;
+    font-size: 0.7rem;
+    padding: 0.18rem 0.55rem 0.18rem 0.18rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    width: fit-content;
+  }
+  #friend-circle-lite-root .card-author:hover {
+    color: rgb(var(--color-text-primary));
+    border-color: rgb(var(--color-accent) / 0.2);
+  }
+  #friend-circle-lite-root .card-author img {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  #friend-circle-lite-root .card-date {
+    color: rgb(var(--color-text-secondary));
+    opacity: 0.6;
+    font-size: 0.68rem;
+    position: absolute;
+    bottom: 0.7rem;
+    right: 0.9rem;
+  }
+  #friend-circle-lite-root .card-title,
+  #friend-circle-lite-root .card-author {
+    position: relative;
+    z-index: 1;
+  }
+  /* .card-bg 已由本地 public/fclite/fclite.css 定稿为 100×100px */
+
+  /* ── 加载更多按钮 ── */
+  #friend-circle-lite-root #load-more-btn {
+    color: rgb(var(--color-text-primary));
+    background: rgb(var(--color-bg-secondary) / 0.5);
+    border: 1px solid rgb(var(--color-border-primary));
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 0.55rem 2rem;
+    width: auto;
+    min-width: 140px;
+    margin: 1.5rem auto 1rem;
+    display: block;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  #friend-circle-lite-root #load-more-btn:hover {
+    background: rgb(var(--color-accent));
+    border-color: rgb(var(--color-accent));
+    color: #fff;
+    min-width: 160px;
+    box-shadow: 0 4px 20px rgb(var(--color-accent) / 0.2);
+  }
+
+  /* ── 统计区（仅保留更新时间）── */
+  #friend-circle-lite-root #stats-container {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    color: rgb(var(--color-text-secondary));
+    opacity: 0.55;
+  }
+
+  /* ── 弹窗 ── */
+  #friend-circle-lite-root .modal {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  #friend-circle-lite-root .modal-content {
+    background: rgb(var(--color-bg-primary) / 0.92);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgb(var(--color-border-primary));
+    border-radius: 1.25rem;
+    box-shadow: 0 20px 60px rgb(var(--color-text-primary) / 0.08);
+  }
+  #friend-circle-lite-root .modal-content hr {
+    border-color: rgb(var(--color-border-primary));
+  }
+  #friend-circle-lite-root .modal-article {
+    border-bottom-color: rgb(var(--color-border-primary));
+  }
+  #friend-circle-lite-root .modal-article .modal-article-title {
+    color: rgb(var(--color-text-primary));
+    font-weight: 600;
+    transition: color 0.2s;
+  }
+  #friend-circle-lite-root .modal-article .modal-article-title:hover {
+    color: rgb(var(--color-accent));
+  }
+  #friend-circle-lite-root .modal-article .modal-article-date {
+    color: rgb(var(--color-text-secondary));
+    opacity: 0.7;
+    font-size: 0.72rem;
+  }
+  #friend-circle-lite-root #modal-author-name-link {
+    color: rgb(var(--color-accent));
+    font-weight: 600;
+  }
+
+  /* ── 加载 / 错误状态 ── */
+  #friend-circle-lite-root .loading-spinner {
+    border-color: rgb(var(--color-border-primary));
+    border-top-color: rgb(var(--color-accent));
+    border-width: 3px;
+    width: 36px;
+    height: 36px;
+  }
+  #friend-circle-lite-root .loading-text,
+  #friend-circle-lite-root .error-text {
+    color: rgb(var(--color-text-secondary));
+    opacity: 0.7;
+    font-size: 0.85rem;
+  }
+  #friend-circle-lite-root .retry-button {
+    background: rgb(var(--color-accent) / 0.1);
+    color: rgb(var(--color-accent));
+    border: 1px solid rgb(var(--color-accent) / 0.18);
+    border-radius: 0.5rem;
+    padding: 0.4rem 1.2rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  #friend-circle-lite-root .retry-button:hover {
+    background: rgb(var(--color-accent) / 0.18);
+  }
+
+  /* ── 卡片入场动画 ── */
+  @keyframes cardFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  #friend-circle-lite-root .card {
+    animation: cardFadeIn 0.4s ease forwards;
+  }
+
+  /* ── 响应式 ── */
+  @media (max-width: 640px) {
+    .status-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .status-head {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     移动端卡片横向溢出修复（只影响 ≤768px；PC 端一条样式都不改）
+     根因：fclite.css 的 .articles-container 用 repeat(auto-fill, minmax(220px, 1fr))，
+           220px 是网格轨道的【硬下限】—— 容器比 220px 窄时轨道不收缩，
+           整片卡片墙直接撑出视口 → 页面出现横向滚动条。
+     修法：minmax(0, 1fr)（允许轨道收缩到 0）+ 全链路 min-width: 0，
+           让每一层都能跟着视口收缩；外层再 clip 一道兜底。
+     注意：只用 overflow-x: clip（不产生滚动容器、不裁纵向），
+           .card:hover 的 translateY 悬浮效果在纵向不受影响。
+     ═══════════════════════════════════════════════════════════ */
+  @media (max-width: 768px) {
+    /* 页面外层：自身不产生横向滚动条 */
+    .fcircle-wrap {
+      max-width: 100%;
+      overflow-x: clip;
+    }
+
+    /* 插件挂载点 */
+    #friend-circle-lite-root {
+      max-width: 100%;
+      min-width: 0;
+      overflow-x: clip;
+    }
+
+    /* 卡片墙（核心修复）：单列 + 可收缩轨道 */
+    #friend-circle-lite-root .articles-container {
+      grid-template-columns: minmax(0, 1fr) !important;
+      gap: 0.7rem !important;
+      width: 100% !important;
+    }
+
+    /* 单张卡片：允许收缩，内部裁切兜底；窄屏压内边距（桌面端 1.15/1.1rem 不变），
+       单列后每张卡少浪费 ~18px 横向空间，长标题/作者名不再被挤到贴边 */
+    #friend-circle-lite-root .card {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      overflow: hidden;
+      padding: 0.8rem 0.85rem;
+    }
+    #friend-circle-lite-root .card-title {
+      min-width: 0;
+      max-width: 100%;
+    }
+    /* 作者药丸：桌面端是 width:fit-content + 无 overflow，长作者名会把药丸撑出卡片。
+       移动端限宽 + 裁切（文字超出部分直接不显示，不留溢出） */
+    #friend-circle-lite-root .card-author {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+    }
+    #friend-circle-lite-root .card-date {
+      max-width: calc(100% - 1rem);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* 随机文章区：统计格 2 列 + 内容可收缩 */
+    #friend-circle-lite-root #random-article {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      padding: 1.1rem;
+      box-sizing: border-box;
+    }
+    /* 提前到 768px 改竖排（插件自己要到 ≤600px 才改）：
+       横排时 .random-button-container 是 flex-shrink:0，标题 + 按钮行会互挤，
+       601–768px 这段区间最容易横着撑出去 */
+    #friend-circle-lite-root .random-content {
+      flex-direction: column;
+      align-items: center;
+      gap: 0.9rem;
+    }
+    #friend-circle-lite-root .random-button-container {
+      width: 100%;
+      justify-content: center;
+      flex-wrap: wrap;
+      row-gap: 0.5rem;
+    }
+    #friend-circle-lite-root .random-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 0.6rem !important;
+    }
+    #friend-circle-lite-root .random-container,
+    #friend-circle-lite-root .random-meta,
+    #friend-circle-lite-root .random-author,
+    #friend-circle-lite-root .random-date {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    /* 加载更多按钮：不再固定最小宽度 */
+    #friend-circle-lite-root #load-more-btn {
+      min-width: 0;
+      max-width: 100%;
+      padding: 0.55rem 1.5rem;
+    }
+
+    /* 友链状态卡：沿用 640px 断点的两列，但轨道允许收缩 */
+    .status-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    /* 网格项默认 min-width:auto（= min-content），这里显式归零兜底 */
+    .status-card {
+      min-width: 0;
+      max-width: 100%;
+    }
+    .status-section {
+      padding: 1.1rem;
+      max-width: 100%;
+    }
+  }
+
+  /* 减弱动效偏好 */
+  @media (prefers-reduced-motion: reduce) {
+    #friend-circle-lite-root .card {
+      animation: none !important;
+    }
+  }
+</style>

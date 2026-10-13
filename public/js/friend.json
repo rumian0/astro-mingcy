@@ -1,0 +1,7 @@
+{
+  "friends": [
+    ["示例博客 A", "https://example.com/a", "/image/avatar-placeholder-a.svg"],
+    ["示例博客 B", "https://example.com/b", "/image/avatar-placeholder-b.svg"],
+    ["示例博客 C", "https://example.com/c", "/image/avatar-placeholder-c.svg"]
+  ]
+}

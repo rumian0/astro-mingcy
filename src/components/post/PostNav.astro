@@ -1,0 +1,35 @@
+---
+import type { CollectionEntry } from 'astro:content'
+import { getPostUrl } from '@/utils/content'
+
+interface Props {
+  prev?: CollectionEntry<'posts'>
+  next?: CollectionEntry<'posts'>
+  class?: string
+}
+
+const { prev, next, class: className } = Astro.props
+---
+
+<div class="grid grid-cols-2" class:list={[className]}>
+  <div>
+    {
+      prev && (
+        <a class="flex items-baseline gap-2 hover:text-accent" href={getPostUrl(prev)}>
+          <i class="iconfont icon-arrow-left" />
+          <span>{prev.data.title}</span>
+        </a>
+      )
+    }
+  </div>
+  <div>
+    {
+      next && (
+        <a class="flex items-baseline justify-end gap-2 hover:text-accent" href={getPostUrl(next)}>
+          <span>{next.data.title}</span>
+          <i class="iconfont icon-arrow-right" />
+        </a>
+      )
+    }
+  </div>
+</div>

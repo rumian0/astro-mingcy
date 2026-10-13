@@ -1,0 +1,369 @@
+/* ═══════════════════════════════════════════════════════
+   Friend-Circle-Lite 本地精简版（fclite.css）
+   ─────────────────────────────────────────────────────
+   来源：https://github.com/willow-god/Friend-Circle-Lite main/fclite.css
+   精简说明：
+   · 仅保留布局/结构/动画（颜色统一由 fcircle.astro 的主题覆盖接管，
+     全部使用站点 CSS 变量 → 随黑白模式切换）
+   · #friend-circle-lite-root .card-bg 尺寸定稿为 100×100px
+   · 移除 sourcemap 注释
+   ═══════════════════════════════════════════════════════ */
+:root {
+  --text-color-light: #000000;
+  --text-color-dark: #f7f7fa;
+  --background-color-light: #f4f4f9;
+  --background-color-dark: #181818;
+  --container-bg-color-light: white;
+  --container-bg-color-dark: #1d1e22;
+  --hover-color: #3498db;
+  --author-color-light: gray;
+  --author-color-dark: #b3b3b3;
+  --modal-bg-blur: 25px;
+  --shadow-color-light: rgba(0, 0, 0, 0.1);
+  --shadow-color-dark: rgba(255, 255, 255, 0.1);
+  --border-color-light: #e3e8f7;
+  --border-color-dark: #42444a;
+}
+[data-theme='light'] {
+  --text-color: var(--text-color-light);
+  --background-color: var(--background-color-light);
+  --tag-bg-color: #bfbfbf;
+  --container-bg-color: var(--container-bg-color-light);
+  --author-color: var(--author-color-light);
+  --shadow-color: var(--shadow-color-light);
+  --border-color: var(--border-color-light);
+  --modal-bg-color: rgba(255, 255, 255, 0.5);
+  --modal-content-bg-color: rgba(239, 250, 255, 0.5);
+  --load-more-btn-bg-color: var(--container-bg-color);
+}
+[data-theme='dark'] {
+  --text-color: var(--text-color-dark);
+  --background-color: var(--background-color-dark);
+  --tag-bg-color: #474747;
+  --container-bg-color: var(--container-bg-color-dark);
+  --author-color: var(--author-color-dark);
+  --shadow-color: var(--shadow-color-dark);
+  --border-color: var(--border-color-dark);
+  --modal-bg-color: rgba(0, 0, 0, 0.3);
+  --modal-content-bg-color: rgba(20, 20, 20, 0.5);
+  --load-more-btn-bg-color: var(--container-bg-color);
+}
+
+#friend-circle-lite-root {
+  width: 100%;
+}
+
+/* ── 随机文章区布局 ── */
+#random-article {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  width: 100%;
+  margin: 0 0 16px 0;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.random-top {
+  width: 100%;
+}
+.random-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.stat-item {
+  text-align: center;
+  transition: all 0.3s ease;
+}
+.stat-num {
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-text {
+  text-transform: uppercase;
+}
+.random-content {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+.random-container {
+  flex: 1;
+  min-width: 0;
+}
+.random-container-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.random-title {
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.random-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+}
+.random-author,
+.random-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.3s ease;
+}
+.random-button-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-shrink: 0;
+}
+@media screen and (max-width: 768px) {
+  .random-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media screen and (max-width: 600px) {
+  .random-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  .random-container {
+    text-align: center;
+  }
+  .random-meta {
+    justify-content: center;
+  }
+  .random-button-container {
+    justify-content: center;
+    width: 100%;
+  }
+}
+@media screen and (max-width: 400px) {
+  .random-stats {
+    gap: 8px;
+  }
+  .stat-item {
+    padding: 10px 8px;
+  }
+}
+
+/* ── 加载 / 错误占位 ── */
+.error-placeholder,
+.loading-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 12px;
+}
+.loading-spinner {
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.error-icon {
+  font-size: 48px;
+}
+.retry-button {
+  margin-top: 8px;
+}
+
+/* ── 弹窗布局 ── */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--modal-bg-color);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s ease-in-out,
+    visibility 0.3s ease-in-out;
+}
+.modal-open {
+  opacity: 1;
+  visibility: visible;
+}
+.modal-content {
+  opacity: 0;
+  position: relative;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(-50px);
+  width: 350px;
+  padding: 20px;
+  z-index: 1000;
+  max-height: 90%;
+  overflow: hidden;
+  transition:
+    transform 0.3s ease-in-out,
+    opacity 0.3s ease-in-out;
+}
+.modal.modal-open .modal-content {
+  transform: translate(-50%, -50%) translateY(0);
+  opacity: 1;
+}
+.modal-content:hover #modal-bg {
+  transform: scale(1.1);
+}
+@media screen and (max-width: 440px) {
+  .modal-content {
+    width: 80%;
+  }
+}
+#modal-bg {
+  position: absolute;
+  filter: blur(5px);
+  opacity: 0.2;
+  z-index: 0;
+  border-radius: 125px 125px 12px 125px !important;
+  margin: 0 !important;
+  width: 250px;
+  height: 250px;
+  right: -20px;
+  bottom: -20px;
+  object-fit: cover;
+  transition: transform 0.6s ease !important;
+}
+#modal-author-avatar {
+  display: block;
+  margin: 5px auto !important;
+  border-radius: 50% !important;
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+}
+#modal-author-name-link {
+  display: block;
+  text-align: center;
+  font-size: 15px;
+  margin: 15px 0;
+  text-decoration: none;
+}
+#modal-author-name-link:hover {
+  text-decoration: underline;
+}
+.modal-content hr {
+  margin: 20px 0;
+}
+#modal-articles-container {
+  position: relative;
+  z-index: 1;
+  border-top: var(--hover-color) double 2px;
+  margin-top: 20px;
+  padding-top: 10px;
+}
+.modal-article {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+.modal-article .modal-article-title {
+  font-size: 18px;
+  line-height: 1.2;
+  cursor: pointer;
+  max-height: 2.5em;
+  width: 100%;
+  margin-bottom: 5px;
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.modal-article .modal-article-date {
+  font-size: 12px;
+  width: 100%;
+  padding: 5px;
+  cursor: default;
+  text-align: right;
+}
+
+/* ── 文章卡片布局 ── */
+.articles-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+.card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.card-title {
+  cursor: pointer;
+  max-height: 4.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.card-author {
+  cursor: pointer;
+  display: flex;
+  width: fit-content;
+  align-items: center;
+}
+#friend-circle-lite-root .card-author img {
+  margin: 0 2px !important;
+}
+.card-date {
+  position: absolute;
+  z-index: 1;
+  bottom: 10px;
+  cursor: default;
+  right: 10px;
+  display: flex;
+  align-items: center;
+}
+
+/* ── 卡片右下角背景图（定稿 100×100px） ── */
+#friend-circle-lite-root .card-bg {
+  cursor: default;
+  z-index: 0;
+  border-radius: 50% !important;
+  margin: 0 !important;
+  position: absolute;
+  bottom: -12px;
+  right: -12px;
+  width: 100px;
+  height: 100px;
+  opacity: 0.15;
+  object-fit: cover;
+  transition:
+    transform 0.6s ease,
+    opacity 0.4s ease;
+}
+#friend-circle-lite-root .card:hover .card-bg {
+  transform: scale(1.1);
+  opacity: 0.3;
+}
+
+/* ── 统计区（仅保留更新时间，版权行已在本地 JS 中移除） ── */
+#stats-container > * {
+  margin-bottom: 3px;
+}

@@ -1,0 +1,34 @@
+/* ─── Swup 页面切换：丝滑弹簧过渡 ───
+   离开：快速淡出 + 轻微缩小 + 模糊（0.3s，低于 Swup 默认 400ms 超时）
+   进入：弹簧 overshoot 曲线（cubic-bezier(0.34, 1.56, 0.64, 1)）从 scale(0.965) 弹入，
+        配合主页卡片点击时的 .card-press 弹出，形成"文章被弹出来"的整体观感 */
+
+/* 目标态 + 进入时的过渡（弹簧曲线） */
+html.is-changing .swup-transition-fade {
+  transition:
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.45s ease;
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0px);
+}
+
+/* 隐藏态：离开动画目标 + 新页面入场起点 */
+html.is-animating .swup-transition-fade {
+  opacity: 0;
+  transform: scale(0.965);
+  filter: blur(3px);
+  /* 离开阶段缩短到 0.3s，避免被 Swup 默认超时截断产生闪跳 */
+  transition-duration: 0.3s, 0.3s, 0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.is-changing .swup-transition-fade,
+  html.is-animating .swup-transition-fade {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}

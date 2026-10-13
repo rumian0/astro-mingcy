@@ -1,0 +1,367 @@
+---
+import type { ImageMetadata } from 'astro'
+import { getCollection } from 'astro:content'
+import PageLayout from '@/layouts/PageLayout.astro'
+
+export async function getStaticPaths() {
+  const galleries = await getCollection('galleries', ({ data }) => !data.draft)
+  return galleries.map((g) => ({
+    params: { slug: g.id.replace(/\/index\.(md|mdx)$/, '').replace(/\.(md|mdx)$/, '') },
+    props: { entry: g },
+  }))
+}
+
+const { entry } = Astro.props
+const { slug } = Astro.params
+const { title, description, date } = entry.data
+
+const allImages = import.meta.glob<{ default: ImageMetadata }>(
+  "/src/content/galleries/**/*.{jpg,jpeg,png,webp,avif,gif,JPG,JPEG,PNG,WEBP}",
+  { eager: true }
+)
+
+// 实况照片资产：同名 .pvt 存在时，该项走实况灯箱（点击放大播放视频）。
+// 原 Motion Photo jpg 会让浏览器下载两遍整份文件（<img> 一遍 +
+// Heo 抽内嵌视频时 fetch 再一遍）；.pvt 一次下载同时拿到封面和视频。
+const allPvt = import.meta.glob<string>("/src/content/galleries/**/*.pvt", {
+  query: "?url",
+  import: "default",
+  eager: true,
+})
+
+// 实况缩略图的加载占位：1x1 透明 gif。
+// 不直接把 .pvt 当 img src（浏览器会把 ZIP 当图片出一帧破图），
+// 也不用原图 jpg 做 src（会与 .pvt 双下载）。img 用 width/height 属性预留
+// intrinsic 尺寸（来自 ImageMetadata），瀑布流布局稳定不跳动、原生比例无裁切。
+// Heo 解包 .pvt 后把 img.src 换成 blob 封面（同尺寸）。
+const LIVE_PLACEHOLDER =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+
+type GalleryImage = {
+  src: string
+  alt: string
+  width?: number
+  height?: number
+  live?: boolean
+  pvt?: string
+  /** Google Motion Photo 直链：img src 本身就是封面+视频，Heo 抓整份拆视频 */
+  motion?: string
+  /** 分离模式：小封面（缩略图 + 灯箱预览） */
+  cover?: string
+  /** 分离模式：视频（只在长按/点开灯箱时下载） */
+  video?: string
+  /** 素材在远端 CDN（体积 1MB+，必须 lazy，不能 eager） */
+  remote?: boolean
+}
+
+// 远端素材清单：src/data/gallery-manifests/<slug>.json（素材放 CDN，仓库不背体积）。
+// 不能放 src/content/galleries/<slug>/ 下：任何 .json 都会被内容集合当成 data
+// entry，与 .md 内容混在一起抛 MixedContentDataCollectionError。
+// 两种形态：
+// - { cover, video }：封面/视频分离部署（推荐）。缩略图只下小封面（~200KB），
+//   视频只在长按/点开灯箱时下载。首屏流量最小。
+// - { src, live:"motion" }：Motion Photo 单文件。浏览器给 <img> 发请求不带
+//   Range，要画封面就必须整份下载（1-2.6MB），手机上明显更慢。
+// 分离模式靠 <img src=cover data-live-video=video>（Heo 原生支持），
+// 灯箱靠 data-cover + data-video（resolveAssets 直接返回，不用解包）。
+type RemoteManifest = {
+  images: Array<
+    | { alt: string; width: number; height: number; cover: string; video: string }
+    | { alt: string; width: number; height: number; src: string; live: "motion" }
+  >
+}
+const manifests = import.meta.glob("/src/data/gallery-manifests/*.json", {
+  eager: true,
+}) as Record<string, RemoteManifest | { default: RemoteManifest }>
+const manifestMod = manifests[`/src/data/gallery-manifests/${slug}.json`]
+const remoteImages: GalleryImage[] = (() => {
+  if (!manifestMod) return []
+  // JSON 模块经 glob 得到的是 { default: {...} }，这里两个分支都兼容
+  const m = "default" in manifestMod ? manifestMod.default : manifestMod
+  return m.images.map((img) =>
+    "cover" in img
+      ? {
+          src: img.cover,
+          alt: img.alt || title,
+          width: img.width,
+          height: img.height,
+          live: true,
+          cover: img.cover,
+          video: img.video,
+          remote: true,
+        }
+      : {
+          src: img.src,
+          alt: img.alt || title,
+          width: img.width,
+          height: img.height,
+          live: true,
+          motion: img.src,
+          remote: true,
+        }
+  )
+})()
+
+const localImages: GalleryImage[] = Object.entries(allImages)
+  .filter(
+    ([path]) =>
+      path.startsWith(`/src/content/galleries/${slug}/`) && !path.includes("index")
+  )
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([path, mod]) => {
+    const file = path.split("/").pop() || ""
+    const base = file.replace(/\.[^.]+$/, "")
+    const pvt = allPvt[`/src/content/galleries/${slug}/${base}.pvt`]
+    return {
+      src: mod.default.src,
+      alt: base.replace(/[-_]/g, " ") || title,
+      width: mod.default.width,
+      height: mod.default.height,
+      live: Boolean(pvt),
+      pvt,
+    }
+  })
+
+const bodyImages: GalleryImage[] = Array.from(entry.body?.matchAll(/<img\b[^>]*>/gi) || [])
+  .map((match) => {
+    const tag = match[0]
+    const src = /\bsrc="([^"]+)"/i.exec(tag)?.[1]
+    const alt = /\balt="([^"]+)"/i.exec(tag)?.[1] || title
+    return src ? { src, alt } : null
+  })
+  .filter((image): image is { src: string; alt: string } => Boolean(image))
+
+const images: GalleryImage[] = remoteImages.length
+  ? remoteImages
+  : localImages.concat(bodyImages)
+---
+
+<PageLayout>
+  <div class="max-w-[1100px] px-4 md:px-8 py-20 mx-auto">
+    <div class="mb-10">
+      <h1 class="text-4xl font-bold">{title}</h1>
+      <p class="mt-2 text-secondary">{description}</p>
+      <div class="mt-3 flex items-center gap-4 text-sm text-secondary">
+        <span>{date.toLocaleDateString('zh-CN')}</span>
+        <span>{images.length} 张照片</span>
+      </div>
+    </div>
+
+    {images.length > 0 ? (
+      <div class="gallery-waterfall" id="gallery-waterfall">
+        {images.map((img, idx) => (
+          // data-cover/data-video：pvt 项给 src 当解包失败兜底 + 空 video；
+          // 分离模式给真 cover/video；motion 项都不给（灯箱自己解包出封面）。
+          <a
+            href={img.live ? undefined : img.src}
+            class={`gallery-item group${img.live ? ' gallery-live' : ''}`}
+            data-fancybox="gallery"
+            data-no-swup
+            data-caption={img.alt}
+            data-pvt={img.live ? img.pvt : undefined}
+            data-motion={img.live ? img.motion : undefined}
+            data-cover={img.live ? img.pvt ? img.src : img.cover : undefined}
+            data-video={img.live ? img.pvt ? "" : img.video : undefined}
+            aria-label=`View image: ${img.alt}`
+          >
+            <img
+              src={img.live && img.pvt ? LIVE_PLACEHOLDER : img.src}
+              alt={img.alt}
+              width={img.width}
+              height={img.height}
+              class="gallery-img"
+              data-live-pvt={img.live ? img.pvt : undefined}
+              data-live-motion={img.live && img.motion ? img.motion : undefined}
+              data-live-video={img.live && img.video ? img.video : undefined}
+              loading={img.remote ? "lazy" : idx < 6 ? "eager" : "lazy"}
+              decoding="async"
+            />
+            <div class="gallery-overlay">
+              <span class="gallery-alt">{img.alt}</span>
+            </div>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <p class="text-center text-secondary py-12">暂无照片</p>
+    )}
+  </div>
+</PageLayout>
+
+<style>
+  /* -------- 瀑布流容器：CSS column 布局，列数响应式 --------
+     桌面 3 列 / 平板 2 列 / 手机 1 列；列间距 16px。
+     不能用 column-fill:auto（容器无明确高度时 Chrome 会把所有图堆进第一列，
+     表现为只有一列）；用默认 balance 让图片平衡分布到各列，才是瀑布流多列。 */
+  .gallery-waterfall {
+    column-count: 3;
+    column-gap: 1rem;
+    padding: 0;
+    margin: 0;
+  }
+  @media (max-width: 768px) { .gallery-waterfall { column-count: 2; } }
+  @media (max-width: 480px) { .gallery-waterfall { column-count: 1; } }
+
+  /* -------- 单个相册项 --------
+     必须块级 + break-inside:avoid，否则 CSS column 会把图片拦腰截断到下一列。
+     不设 aspect-ratio、不设固定高 → 高度由图片 intrinsic 尺寸决定，无裁切。 */
+  .gallery-item {
+    position: relative;
+    display: block;
+    width: 100%;
+    margin: 0 0 1rem;
+    padding: 0;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    cursor: zoom-in;
+    background: rgb(from var(--color-text-primary) r g b / 0.05);
+    border: 1px solid rgb(from var(--color-border) r g b / 0.25);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .gallery-item:hover {
+    border-color: rgb(from var(--color-accent) r g b / 0.4);
+    box-shadow: 0 4px 24px rgb(from var(--color-accent) r g b / 0.12);
+  }
+  /* 实况项加载态：缩略图在 Heo 解包 .pvt 前是 1x1 透明 gif，若不设可见底色
+     就是一块空白（之前被误判为「页面空白」）。深灰扫光明确传达「实况图加载中」；
+     解包后 img 换成不透明 blob 封面，把扫光完全盖住。 */
+  .gallery-item.gallery-live {
+    background: linear-gradient(
+      90deg,
+      rgb(from var(--color-text-primary) r g b / 0.08) 25%,
+      rgb(from var(--color-text-primary) r g b / 0.16) 37%,
+      rgb(from var(--color-text-primary) r g b / 0.08) 63%
+    );
+    background-size: 400% 100%;
+    animation: gallery-shimmer 1.8s ease infinite;
+  }
+  @keyframes gallery-shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .gallery-item.gallery-live { animation: none; }
+  }
+  /* 图片：严格按原始比例渲染，无裁切、无拉伸。
+     width/height 属性预留尺寸防布局跳动；height:auto 让高度按比例。 */
+  .gallery-img {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    transition: transform 0.4s ease, opacity 0.3s ease;
+  }
+  .gallery-item:hover .gallery-img { transform: scale(1.03); }
+  .gallery-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    padding: 0.75rem;
+    background: linear-gradient(to top, rgb(0 0 0 / 0.6) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .gallery-item:hover .gallery-overlay { opacity: 1; }
+  .gallery-alt { font-size: 0.75rem; color: white; text-shadow: 0 1px 3px rgb(0 0 0 / 0.5); }
+</style>
+
+<!-- 实况图（HeoLivePhoto）兼容层 + 实况灯箱样式。
+     is:global：上方 <style> 默认作用域会被 Astro 追加 [data-astro-cid-xxx]，
+     而插件运行时创建的 <span> 与 Fancybox 创建的灯箱 DOM 都没有这个属性，
+     规则永不生效。!important 用于压过插件/Fancybox 写入的 inline 样式。 -->
+<style is:global>
+  /* HeoLivePhoto 把实况图 img 包进匿名 <span>（无 class）并写 inline 样式。
+     强制成块级、满宽、高度自适应，避免 1:1 方格时代留下的裁切。 */
+  .gallery-item > span {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    line-height: 0;
+  }
+  .gallery-item .gallery-img {
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+    transition: transform 0.4s ease, opacity 0.3s ease !important;
+  }
+  /* 插件把 img 写成 position:relative + z-index:1，提上图注层保持可点击 */
+  .gallery-item .gallery-overlay { z-index: 3; }
+
+  /* -------- Fancybox 灯箱内的实况播放器（由 Layout.astro 的 initFancybox 在
+            contentReady 阶段从 data-* 动态注入，与缩略图 DOM 完全解耦）-------- */
+  .lp-player {
+    position: relative;
+    display: block;
+    margin: 0 auto;
+    line-height: 0;
+    background: #000;
+    min-width: 220px;
+    min-height: 140px;
+  }
+  .lp-cover {
+    display: block;
+    max-width: min(92vw, 1280px);
+    max-height: min(86vh, 980px);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    margin: 0;
+    border: 0;
+    /* 放大后动效：视频解码前对封面做缓慢 Ken Burns，避免「放大后是一张死图」 */
+    animation: lp-kenburns 8s ease-out forwards;
+    transform-origin: center center;
+  }
+  @keyframes lp-kenburns {
+    0% { transform: scale(1.02); }
+    100% { transform: scale(1.12); }
+  }
+  .lp-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    margin: 0;
+    border: 0;
+    background: #000;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+  }
+  .lp-video.is-waiting { opacity: 0; }
+  .lp-spin {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 34px; height: 34px;
+    margin: -17px 0 0 -17px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.28);
+    border-top-color: #fff;
+    animation: lp-spin 0.8s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes lp-spin { to { transform: rotate(360deg); } }
+  .lp-caption {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    margin: 0;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #fff;
+    background: linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0));
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lp-cover { animation: none; }
+    .lp-video { transition: none; }
+    .lp-spin { animation-duration: 1.6s; }
+  }
+</style>

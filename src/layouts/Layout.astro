@@ -1,0 +1,1260 @@
+---
+import {
+  CommonHead,
+  WebAnalytics,
+  ThemeLoader,
+  AccentColorInjector,
+  PrintVersion,
+} from '@/components/head'
+import { BackToTopFAB } from '@/components/BackToTopFAB'
+import { ToastContainer } from '@/components/ToastContainer'
+import { ModalStack } from '@/components/ui/modal'
+import Analytics from '@vercel/analytics/astro'
+import SearchModal from '@/components/header/SearchModal.astro'
+import { site } from '@/config.json'
+import '@/styles/global.css'
+
+interface Props {
+  title?: string
+  description?: string
+  image?: string
+}
+
+const { title, description, image } = Astro.props
+---
+
+<!doctype html>
+<html lang={site.lang}>
+  <head>
+    <CommonHead title={title} description={description} image={image} />
+    <WebAnalytics />
+    <ThemeLoader />
+    <AccentColorInjector />
+    <PrintVersion />
+    <!-- Umami 统计：已开源版移除个人实例。如需启用，在此放回你自己的 Umami script 标签，
+         或改用 config.json 的 analytics.umami 配置。示例：
+         <script is:inline async defer src="https://your-umami.example.com/script.js" data-website-id="YOUR_ID"></script> -->
+    <!-- 朋友圈插件样式：放在 head 全局加载（Swup 切页不替换 head），避免 main 内 link 在切页后未加载导致卡片样式丢失 -->
+    <link rel="stylesheet" href="/fclite/fclite.css" />
+    <!-- Fancybox 图片灯箱样式（本地化，避免 CDN 被跟踪防护拦截） -->
+    <link rel="stylesheet" href="/fancybox/fancybox.min.css" />
+    <!-- Pagefind 搜索 UI 样式：head 全局加载，保证首次打开搜索模态框样式已就绪 -->
+    <link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+  </head>
+  <body>
+    <!-- 全局壁纸背景：随机壁纸 + 高斯模糊 + 明暗遮罩，避免影响文字。
+         与右侧侧边栏卡片（.bg-shared-media）共用 :root 的 --random-bg-url，只下载一次 -->
+    <div class="site-wallpaper" aria-hidden="true"></div>
+    <div class="site-grain hidden-mobile pointer-events-none fixed inset-0 z-0" aria-hidden="true">
+    </div>
+    <script is:inline data-swup-ignore-script>
+      // 注册背景图 Service Worker（仅 https/localhost，sw.js 在 public/ 根）
+      // SW 拦截随机图 API 请求，Stale-While-Revalidate + 固定 KEY 缓存：
+      //   首次走网络（慢，必然）；之后每次刷新命中缓存秒开，后台静默更新下一张。
+      //   opaque response（no-cors）可被 cache.put 存、被 img/css 渲染，不需要 CORS 头。
+      // data-swup-ignore-script：Swup 切页不重建 body，注册只跑一次。
+      if (
+        'serviceWorker' in navigator &&
+        (location.protocol === 'https:' ||
+          location.hostname === 'localhost' ||
+          location.hostname === '127.0.0.1')
+      ) {
+        navigator.serviceWorker.register('/sw.js').catch(function () {})
+      }
+    </script>
+    <script is:inline data-swup-ignore-script>
+      // 随机壁纸：一次请求，多处复用 + Service Worker 跨刷新缓存
+      //
+      // 行为：未加载完 = 纯色背景（::before 无图 + opacity:0，露元素 background-color），
+      //       decode 完成后才 apply → 设 CSS 变量 + 加 .bg-ready → 两处图片层 0.9s 淡入。
+      //       SW 命中缓存时 new Image 秒级 load；首次访问无缓存走网络（慢，必然）。
+      //       失败时静默，保持纯色占位（用户要的「没加载出来之前黑白纯色背景」）。
+      // 全局背景层（.site-wallpaper）与右侧侧边栏卡片（.bg-shared-media）以前各自直连
+      // 随机图接口；早期方案下全局背景与侧边栏卡片各自直连，会下载两次且结果不同 → 画面割裂。
+      // 现在只发 1 次请求，把带时间戳的真实 URL 写入 :root 的 --random-bg-url，
+      // 所有消费方统一读 background-image: var(--random-bg-url)。
+      // Swup 切页不重建 body，此脚本只跑一次，SPA 导航期间壁纸保持稳定不闪变
+      //
+      // 随机图源：默认用 picsum.photos（公开免费）。换成自建随机图接口只需改下方 URL。
+      // sw.js 里的 BG_HOST 也要同步改成你的随机图域名。
+      ;(function () {
+        var docEl = document.documentElement
+        var settled = false
+
+        // 成功：写入 CSS 变量 + 加 .bg-ready → 两处图片层同步 0.9s 淡入
+        function apply(url) {
+          if (settled) return
+          settled = true
+          docEl.style.setProperty('--random-bg-url', "url('" + url + "')")
+          docEl.classList.add('bg-ready')
+        }
+
+        var url = 'https://picsum.photos/1920/1080?v=' + Date.now()
+        var img = new Image()
+        img.addEventListener('load', function () {
+          // decode() 保证帧已解码，写入变量时不闪；不支持/失败时直接 apply（CSS 渲染仍可用）
+          if (typeof img.decode === 'function') {
+            img.decode().then(
+              function () {
+                apply(url)
+              },
+              function () {
+                apply(url)
+              },
+            )
+          } else {
+            apply(url)
+          }
+        })
+        img.addEventListener('error', function () {
+          // 静默：保持纯色占位，不强制显示兜底图（用户要的就是「没加载完纯色」）
+        })
+        img.src = url
+      })()
+    </script>
+
+    <slot />
+
+    <BackToTopFAB client:only="react" />
+    <ToastContainer client:only="react" />
+    <ModalStack client:only="react" />
+    <Analytics />
+    <script is:inline>
+      // Swup 切页前（main 内容替换前）通知 main 内所有 React island 释放
+      // 定时器/rAF/观察器/监听器，防止旧实例泄漏导致页面切换卡顿
+      document.addEventListener('swup:content:replace', () => {
+        document.dispatchEvent(new CustomEvent('mcy:island-cleanup'))
+      })
+    </script>
+    <script is:inline>
+      // 滚动时临时移除 backdrop-filter（毛玻璃是滚动重绘卡顿的主因），
+      // 滚动停止 120ms 后恢复玻璃效果；配合 body.is-scrolling 的 CSS 降级规则
+      ;(function () {
+        var ticking = false
+        var timer = null
+        var onScroll = function () {
+          if (ticking) return
+          ticking = true
+          requestAnimationFrame(function () {
+            document.body.classList.add('is-scrolling')
+            ticking = false
+            clearTimeout(timer)
+            timer = setTimeout(function () {
+              document.body.classList.remove('is-scrolling')
+            }, 120)
+          })
+        }
+        window.addEventListener('scroll', onScroll, { passive: true })
+      })()
+    </script>
+    <script is:inline>
+      // 代码块复制按钮（委托到 document，Swup 切页后依然生效）
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.copy-code')
+        if (!btn) return
+        var block = btn.closest('.code-block')
+        var pre = block ? block.querySelector('pre') : null
+        var text = pre ? pre.innerText : ''
+        if (!text) return
+        navigator.clipboard
+          .writeText(text)
+          .then(function () {
+            btn.textContent = '已复制 ✓'
+            setTimeout(function () {
+              btn.textContent = '复制'
+            }, 800)
+          })
+          .catch(function () {
+            btn.textContent = '复制失败'
+            setTimeout(function () {
+              btn.textContent = '复制'
+            }, 1200)
+          })
+      })
+    </script>
+    <script is:inline>
+      // 朋友圈页（/links/fcircle）初始化：Swup 切页后 main 容器内的 inline 脚本不会重新执行，
+      // 会导致插件区空白、友链状态卡"加载中"。故在此 body 级常驻脚本统一处理，
+      // 页面首次加载与 Swup 切页后自动触发（插件加载 + 友链状态）。
+      ;(function () {
+        var FCLITE_JS = '/fclite/fclite.js'
+
+        // 插件配置（fclite.js 初始化依赖，Swup 切页后 main 内的 UserConfig 不会重跑）
+        window.UserConfig = window.UserConfig || {
+          private_api_url: 'https://your-fcircle-api.example.com/',
+          page_turning_number: 24,
+          error_img: '/fclite/avatar-fallback.svg',
+        }
+
+        function ensureFclite(cb) {
+          if (typeof initialize_fc_lite === 'function') {
+            cb()
+            return
+          }
+          if (document.querySelector('script[data-fclite]')) return
+          var s = document.createElement('script')
+          s.src = FCLITE_JS
+          s.setAttribute('data-fclite', '1')
+          s.onload = cb
+          // 加载失败：清除标记，稍后随下一次 boot 重试
+          s.onerror = function () {
+            s.removeAttribute('data-fclite')
+            setTimeout(boot, 1000)
+          }
+          document.head.appendChild(s)
+        }
+
+        function esc(t) {
+          if (!t) return ''
+          var d = document.createElement('div')
+          d.textContent = t
+          return d.innerHTML
+        }
+
+        // 确保 fclite.css 已加载（防 main 内 link 在 Swup 切页后未应用）
+        function ensureFcliteCss() {
+          var found = false
+          for (var i = 0; i < document.styleSheets.length; i++) {
+            var href = document.styleSheets[i].href || ''
+            if (href.indexOf('/fclite/fclite.css') !== -1) {
+              found = true
+              break
+            }
+          }
+          if (!found && !document.querySelector('link[data-fclite-css]')) {
+            var l = document.createElement('link')
+            l.rel = 'stylesheet'
+            l.href = '/fclite/fclite.css'
+            l.setAttribute('data-fclite-css', '1')
+            document.head.appendChild(l)
+          }
+        }
+
+        function boot() {
+          ensureFcliteCss()
+
+          // 1) 插件动态流
+          var root = document.getElementById('friend-circle-lite-root')
+          if (root) {
+            ensureFclite(function () {
+              if (root.children.length === 0) initialize_fc_lite()
+            })
+          }
+
+          // 2) 友链状态（data-state 防重复拉取）
+          var summary = document.getElementById('links-summary')
+          var grid = document.getElementById('links-grid')
+          if (summary && summary.dataset.state !== 'done') {
+            summary.dataset.state = 'done'
+            fetch('https://your-fcircle-api.example.com/status.json')
+              .then(function (r) {
+                return r.json()
+              })
+              .then(function (data) {
+                var links = data.link_status || []
+                var ok = 0
+                links.forEach(function (it) {
+                  if (it.success) ok++
+                })
+                summary.innerHTML =
+                  '<span class="stat-ok">' +
+                  ok +
+                  ' 正常</span>' +
+                  '<span class="stat-sep">·</span>' +
+                  '<span class="stat-fail">' +
+                  (links.length - ok) +
+                  ' 异常</span>'
+                if (!grid) return
+                grid.innerHTML = links
+                  .map(function (item) {
+                    var cls = item.success ? 'ok' : 'fail'
+                    var label = item.success ? '正常' : '异常'
+                    return (
+                      '<a class="status-card ' +
+                      cls +
+                      '" href="' +
+                      item.link +
+                      '" target="_blank" rel="noopener" title="' +
+                      esc(item.name) +
+                      '">' +
+                      '<span class="sc-indicator"></span>' +
+                      '<span class="sc-name">' +
+                      esc(item.name) +
+                      '</span>' +
+                      '<span class="sc-label">' +
+                      label +
+                      '</span></a>'
+                    )
+                  })
+                  .join('')
+              })
+              .catch(function () {
+                summary.textContent = '暂无数据'
+              })
+          }
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', boot)
+        } else {
+          setTimeout(boot, 200)
+          setTimeout(boot, 800)
+        }
+        // Swup 4 替换后事件：page:view（@swup/astro 在替换完成后派发，同时触发 astro:page-load）
+        document.addEventListener('swup:page:view', function () {
+          setTimeout(boot, 150)
+          setTimeout(boot, 700)
+        })
+        document.addEventListener('astro:page-load', function () {
+          setTimeout(boot, 150)
+          setTimeout(boot, 700)
+        })
+      })()
+    </script>
+    <!-- 评论系统驱动控制器：Twikoo / Waline 双引擎切换 -->
+    <script is:inline>
+      // ────────────────────────────────────────────────
+      // 为什么控制器放在 Layout（而不是评论组件里）：
+      //   Swup 切页只替换 <main>、不重建 body，本脚本常驻单例；
+      //   main 内的 inline 脚本由 SwupScriptsPlugin 每次重跑，
+      //   若在组件内初始化，每切一篇文章就新建一个评论实例且旧的永不销毁。
+      // 两个引擎都按需懒加载：Twikoo 772KB（官方 CDN）/ Waline 262KB（本地），
+      //   只有用户真的切到对应系统才下载，首页与无评论页零成本。
+      // ────────────────────────────────────────────────
+      ;(function () {
+        var KEY = 'mcy-comment-driver'
+        var TWIKOO_ENV_ID = 'https://your-twikoo.vercel.app'
+        // 官方 CDN：jsDelivr 主源 + unpkg 备源（版本钉死 1.7.19，
+        // 与云函数 twikoo-vercel 1.7.19 对齐；本地 public/twikoo/ 已删除）
+        var TWIKOO_JS = [
+          'https://cdn.jsdelivr.net/npm/twikoo@1.7.19/dist/twikoo.all.min.js',
+          'https://unpkg.com/twikoo@1.7.19/dist/twikoo.all.min.js',
+        ]
+        var WALINE_SERVER = 'https://your-waline.vercel.app'
+        var WALINE_JS = '/waline/waline.js'
+        var WALINE_CSS = '/waline/waline.css'
+
+        var twikooScript = null
+        var twikooTryIndex = 0
+        var walinePromise = null
+        var walineInstance = null
+        var walinePath = null
+        var shownDriver = null
+
+        function block() {
+          return document.getElementById('comment-block')
+        }
+
+        function readDriver() {
+          try {
+            return localStorage.getItem(KEY) === 'waline' ? 'waline' : 'twikoo'
+          } catch (e) {
+            return 'twikoo'
+          }
+        }
+
+        function writeDriver(driver) {
+          try {
+            localStorage.setItem(KEY, driver)
+          } catch (e) {}
+        }
+
+        // 懒加载指示器：只跟随当前展示的系统，避免用户已切走后误关别人的加载态
+        function setLoader(driver, on, error) {
+          if (driver !== shownDriver) return
+          var b = block()
+          var el = b ? b.querySelector('.driver-loading') : null
+          if (!el) return
+          if (on) {
+            el.hidden = false
+            var text = el.querySelector('.driver-loading__text')
+            if (text) {
+              text.textContent = error
+                ? error
+                : driver === 'waline'
+                  ? '正在加载 Waline 评论…'
+                  : '正在加载 Twikoo 评论…'
+            }
+            el.setAttribute('data-error', error ? '1' : '0')
+          } else {
+            el.hidden = true
+            el.removeAttribute('data-error')
+          }
+        }
+
+        function syncUI(driver) {
+          var b = block()
+          if (!b) return
+          shownDriver = driver
+          b.querySelectorAll('.comment-driver').forEach(function (el) {
+            // 用 data-engine 而非 id：Twikoo 的 Vue 2 $mount 会替换掉 #twikoo 节点，
+            // 替换后 id 就没了，而外层 data-engine 壳始终存在
+            el.classList.toggle('is-active', el.getAttribute('data-engine') === driver)
+          })
+          b.querySelectorAll('.driver-switch__btn').forEach(function (btn) {
+            var on = btn.getAttribute('data-driver') === driver
+            btn.classList.toggle('is-active', on)
+            btn.setAttribute('aria-selected', on ? 'true' : 'false')
+            btn.tabIndex = on ? 0 : -1
+          })
+          var track = b.querySelector('.driver-switch__track')
+          if (track) {
+            if (!window.__mcyCommentDriverSynced) {
+              // 首次同步：避免高亮块从默认位滑动到记忆位的多余动画
+              track.style.transition = 'none'
+            }
+            track.style.transform = driver === 'waline' ? 'translateX(100%)' : 'translateX(0)'
+            if (!window.__mcyCommentDriverSynced) {
+              requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                  track.style.transition = ''
+                })
+              })
+            }
+          }
+          window.__mcyCommentDriverSynced = true
+        }
+
+        // ─── Twikoo（官方 CDN 懒加载，只有切到本引擎才下载） ───
+        // Twikoo 用 Vue 2 的 $mount('#twikoo')，会把 #twikoo 节点整个替换掉；
+        // 因此幂等标记 data-ready 必须打在永不被替换的外层壳上。
+        function twikooSlot() {
+          return document.querySelector('#comment-block .comment-driver[data-engine="twikoo"]')
+        }
+
+        // ─── 把 Twikoo 运行时注入的 <style> 挪出 <head> ───
+        // Twikoo 的 CSS 不是文件：twikoo.all.min.js 内是 webpack vue-style-loader
+        // 内联样式，脚本首次加载时一次性往 document.head 注入 16 个 <style>
+        // （v1.7.19 实测共 37KB），之后无论再调用多少次 twikoo.init() 都不会重新
+        // 注入（webpack 模块已缓存）。
+        // 而 @swup/astro 默认开启 updateHead（@swup/head-plugin），它挂在
+        // before("content:replace")：每次切页都会把 <head> 里「下一页静态 HTML 的
+        // head 中不存在」的元素全部 removeChild。Twikoo 的 16 个 <style> 正是
+        // 运行时注入、静态 HTML 里不存在 → 切页一次就被删掉且永不补回，
+        // 于是第二篇文章起评论样式全部丢失（首篇正常，之后永久失效）。
+        // 识别只能靠内容：vue-style-loader 注入的 <style> 连 data-vue-ssr-id
+        // 属性都没有（bundle 内 ssrId 为假值）。且这 16 个片段并不都属于 twikoo 自己的
+        // 命名空间 —— 实测分布：
+        //   .tk-*   twikoo 本体（评论列表 / 提交 / 分页 / 管理面板…）
+        //   .el-*   Element UI（按钮 / 文本域 / 标签…，约占 49% 体积）
+        //   OwO     表情面板
+        // 只匹配 tk-comment 只能覆盖 15% 的样式，三个特征必须都认。
+        // <style> 挪到 <body> 后依然全文档生效，且不属 head 清理范围；
+        // 本站 head 内的内联样式只有随机强调色变量（不含 tk-/el-/OwO），不会误伤。
+        // 函数幂等，重复调用只是空转。
+        function adoptTwikooStyles() {
+          var styles = document.head.querySelectorAll('style')
+          for (var i = 0; i < styles.length; i++) {
+            var st = styles[i]
+            var css = st.textContent || ''
+            if (
+              css.indexOf('tk-') === -1 &&
+              css.indexOf('el-') === -1 &&
+              css.indexOf('OwO') === -1
+            ) {
+              continue
+            }
+            document.body.appendChild(st)
+          }
+        }
+
+        function initTwikoo() {
+          var slot = twikooSlot()
+          if (!slot || slot.getAttribute('data-ready')) return
+          if (typeof twikoo !== 'undefined' && twikoo.init) {
+            mountTwikoo()
+            return
+          }
+          if (twikooScript) return // 上一次请求还在飞行（含 CDN 自动切换期间）
+          setLoader('twikoo', true)
+          loadTwikooScript()
+        }
+
+        // 多源加载：某个 CDN 被浏览器跟踪防护 / 网络拦截时自动换下一个源，
+        // 两个源都失败才给用户报错（保持原有 onerror 提示行为不变）
+        function loadTwikooScript() {
+          if (twikooTryIndex >= TWIKOO_JS.length) {
+            setLoader('twikoo', true, 'Twikoo 加载失败，请刷新重试')
+            return
+          }
+          twikooScript = document.createElement('script')
+          twikooScript.src = TWIKOO_JS[twikooTryIndex++]
+          twikooScript.onload = function () {
+            // CSS 就是脚本加载这一刻注入 head 的，必须马上挪走；
+            // 一旦等到 Swup 切页之后才挪，@swup/head-plugin 已经删掉了
+            adoptTwikooStyles()
+            mountTwikoo()
+          }
+          twikooScript.onerror = function () {
+            twikooScript = null
+            loadTwikooScript()
+          }
+          document.head.appendChild(twikooScript)
+        }
+
+        function mountTwikoo() {
+          var slot = twikooSlot()
+          if (!slot || slot.getAttribute('data-ready')) return
+          if (typeof twikoo === 'undefined' || !twikoo.init) {
+            setLoader('twikoo', true, 'Twikoo 加载失败，请刷新重试')
+            return
+          }
+          slot.setAttribute('data-ready', '1')
+          setLoader('twikoo', false)
+          // 兜底（幂等）：覆盖 onload 之外的所有挂载路径
+          adoptTwikooStyles()
+          twikoo.init({ envId: TWIKOO_ENV_ID, el: '#twikoo' })
+        }
+
+        // ─── Waline（本地化 /waline/） ───
+        function ensureWalineCss() {
+          if (document.querySelector('link[data-waline-css]')) return
+          var link = document.createElement('link')
+          link.rel = 'stylesheet'
+          link.href = WALINE_CSS
+          link.setAttribute('data-waline-css', '1')
+          // 挂到 <body> 而非 <head>：<link> 放 body 是合法 HTML5，
+          // 而 @swup/head-plugin 只清理 <head> 子节点 —— 放 head 里每个 Swup 切页
+          // 都会把它删掉（ensureWalineCss 下次虽会重挂自愈），
+          // 中间仍会出现 150~300ms 的 Waline 无样式窗口
+          document.body.appendChild(link)
+        }
+
+        function destroyWaline() {
+          if (!walineInstance) return
+          try {
+            walineInstance.destroy()
+          } catch (e) {}
+          walineInstance = null
+          walinePath = null
+        }
+
+        function initWaline() {
+          var el = document.getElementById('waline')
+          if (!el) return
+          var path = window.location.pathname
+
+          if (walineInstance) {
+            // 实例仍挂在当前文档里：同页切回 → 复用；跨页 → update 换 path
+            if (walineInstance.el && document.contains(walineInstance.el)) {
+              if (walinePath !== path) {
+                walinePath = path
+                try {
+                  walineInstance.update({ path: path })
+                } catch (e) {}
+              }
+              setLoader('waline', false)
+              return
+            }
+            // 旧实例挂在已被 Swup 移除的节点上：销毁后重建到新容器
+            destroyWaline()
+          }
+
+          setLoader('waline', true)
+          ensureWalineCss()
+          if (walinePromise) {
+            walinePromise.then(mountWaline).catch(walineError)
+            return
+          }
+          walinePromise = import(WALINE_JS)
+            .then(function (mod) {
+              mountWaline(mod)
+            })
+            .catch(function () {
+              walinePromise = null
+              walineError()
+            })
+        }
+
+        function mountWaline(mod) {
+          var el = document.getElementById('waline')
+          if (!el) return
+          var init = (mod && (mod.init || (mod.default && mod.default.init))) || null
+          if (!init) {
+            walineError()
+            return
+          }
+          var path = window.location.pathname
+          try {
+            walineInstance = init({
+              el: '#waline',
+              path: path,
+              serverURL: WALINE_SERVER,
+              lang: 'zh-CN',
+              // 跟随本站 data-theme 切换明暗（Waline 原生支持选择器形式）
+              dark: '[data-theme="dark"]',
+              // 注意：requiredMeta 只认 nick / mail / link，写 'email' 会被静默丢弃
+              requiredMeta: ['nick', 'mail'],
+              pageSize: 20,
+              commentSorting: 'latest',
+              // 官方 Weibo 表情集，走 jsDelivr（站点已依赖 jsDelivr，避开 unpkg 301 与被拦截风险）
+              emoji: ['https://cdn.jsdelivr.net/npm/@waline/emojis@1.1.0/weibo'],
+              highlighter: true,
+              noCopyright: true,
+            })
+            walinePath = path
+          } catch (e) {
+            walineInstance = null
+            walineError()
+            return
+          }
+          setLoader('waline', false)
+        }
+
+        function walineError() {
+          walinePromise = null
+          setLoader('waline', true, 'Waline 加载失败，请刷新重试')
+        }
+
+        // ─── 切换入口 ───
+        function switchTo(driver) {
+          var b = block()
+          if (!b) return
+          if (driver !== 'twikoo' && driver !== 'waline') return
+          writeDriver(driver)
+          syncUI(driver)
+          if (driver === 'waline') initWaline()
+          else initTwikoo()
+        }
+
+        function boot() {
+          var b = block()
+          if (!b) {
+            // 无评论区的页面：释放上一页遗留的 Waline 实例
+            destroyWaline()
+            return
+          }
+          var driver = readDriver()
+          syncUI(driver)
+          if (driver === 'waline') initWaline()
+          else initTwikoo()
+        }
+
+        // 事件委托：只绑一次，Swup 切页后的新 DOM 自动生效
+        if (!window.__mcyCommentDriverBound) {
+          window.__mcyCommentDriverBound = true
+
+          document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.driver-switch__btn')
+            if (!btn || !btn.closest('#comment-block')) return
+            switchTo(btn.getAttribute('data-driver'))
+          })
+
+          document.addEventListener('keydown', function (e) {
+            var btn = e.target.closest('.driver-switch__btn')
+            if (!btn || !btn.closest('#comment-block')) return
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+            e.preventDefault()
+            var group = btn.closest('.driver-switch')
+            if (!group) return
+            var list = Array.prototype.slice.call(group.querySelectorAll('.driver-switch__btn'))
+            var idx = list.indexOf(btn)
+            var next =
+              e.key === 'ArrowRight'
+                ? (idx + 1) % list.length
+                : (idx - 1 + list.length) % list.length
+            switchTo(list[next].getAttribute('data-driver'))
+            list[next].focus()
+          })
+        }
+
+        // 首次加载
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', boot)
+        } else {
+          boot()
+          setTimeout(boot, 200)
+        }
+        // Swup 切页：新文章 = 新 path，需重建/更新评论实例
+        document.addEventListener('swup:page:view', function () {
+          setTimeout(boot, 150)
+          setTimeout(boot, 700)
+        })
+        document.addEventListener('astro:page-load', function () {
+          setTimeout(boot, 150)
+          setTimeout(boot, 700)
+        })
+      })()
+    </script>
+    <!-- Fancybox 图片灯箱（本地化，避免 CDN 被跟踪防护拦截）
+         data-swup-ignore-script 不能省：@swup/astro 默认开启 SwupScriptsPlugin
+         （head:true + body:true），它在 content:replace 时用 querySelectorAll 扫【整个
+         document】的 script:not([data-swup-ignore-script])，把每个 <script> 克隆重建并
+         重新执行。不带这个属性时，Swup 每切一次页 Fancybox 都会被重定义成全新实例
+         （openers 清空、点击监听器丢失），而下面 initFancybox 的 +200ms 重绑可能先于
+         UMD 重加载完成 → 灯箱彻底失效，点击变成直跳图片直链 -->
+    <script is:inline src="/fancybox/fancybox.umd.min.js" data-swup-ignore-script></script>
+    <!-- 初始化脚本同样标记 ignore：它的监听器都挂在 document 上（Swup 永不替换），
+         首次加载时就已生效；不带标记会被 SwupScriptsPlugin 每切一次页克隆重跑一次，
+         astro:page-load 监听器无限累加（initFancybox 虽幂等，但调用次数随切页数增长） -->
+    <script is:inline data-swup-ignore-script>
+      // Fancybox 初始化：全站统一图片预览 + 实况灯箱（DOM 解耦）
+      // ----------------------------------------------------------------
+      // 本地化 Fancybox 6.0.29 没有 done 事件，用 Carousel.contentReady
+      // （slide 内容就绪钩子，仅当 slide 有 html 选项时触发）注入实况播放器。
+      // 实况项 <a> 带 data-pvt（本地 .pvt 包）或 data-motion（远端 Motion Photo 直链）
+      // + data-html 空骨架；静态项无 data-html → 走默认 image 灯箱，零影响。
+      ;(function () {
+        // ---- .pvt 解包器（零依赖 ZIP 解析，与 HeoLivePhoto 内部算法一致）----
+        var pvtCache = Object.create(null)
+        function unpackPvt(url) {
+          if (pvtCache[url]) return pvtCache[url]
+          var task = fetch(url)
+            .then(function (r) {
+              if (!r.ok) throw new Error('.pvt HTTP ' + r.status)
+              return r.arrayBuffer()
+            })
+            .then(async function (buffer) {
+              var bytes = new Uint8Array(buffer)
+              var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+              var tail = -1
+              for (var i = bytes.length - 22; i >= Math.max(0, bytes.length - 65558); i--) {
+                if (view.getUint32(i, true) === 0x06054b50) {
+                  tail = i
+                  break
+                }
+              }
+              if (tail < 0) throw new Error('.pvt 不是合法的 zip 包')
+              var entries = view.getUint16(tail + 10, true)
+              var cursor = view.getUint32(tail + 16, true)
+              var decoder = new TextDecoder()
+              var cover = null,
+                video = null
+              for (var n = 0; n < entries; n++) {
+                var method = view.getUint16(cursor + 10, true)
+                var csize = view.getUint32(cursor + 20, true)
+                var nameLen = view.getUint16(cursor + 28, true)
+                var extraLen = view.getUint16(cursor + 30, true)
+                var commentLen = view.getUint16(cursor + 32, true)
+                var localHead = view.getUint32(cursor + 42, true)
+                var name = decoder.decode(bytes.subarray(cursor + 46, cursor + 46 + nameLen))
+                cursor += 46 + nameLen + extraLen + commentLen
+                var base = name.split('/').pop() || ''
+                if (!cover && /\.(jpe?g|webp|png)$/i.test(base))
+                  cover = { method: method, head: localHead, size: csize }
+                else if (!video && /\.(mp4|mov)$/i.test(base))
+                  video = { method: method, head: localHead, size: csize }
+                if (cover && video) break
+              }
+              if (!cover || !video) throw new Error('.pvt 内没有封面或视频')
+              function extract(entry) {
+                var start =
+                  entry.head +
+                  30 +
+                  view.getUint16(entry.head + 26, true) +
+                  view.getUint16(entry.head + 28, true)
+                var data = bytes.subarray(start, start + entry.size)
+                if (entry.method === 0) return Promise.resolve(new Blob([data]))
+                if (entry.method === 8 && typeof DecompressionStream === 'function') {
+                  return new Response(
+                    new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw')),
+                  ).blob()
+                }
+                return Promise.reject(new Error('不支持的 zip 压缩方式 ' + entry.method))
+              }
+              var parts = await Promise.all([extract(cover), extract(video)])
+              return { cover: URL.createObjectURL(parts[0]), video: URL.createObjectURL(parts[1]) }
+            })
+          pvtCache[url] = task
+          task.catch(function () {
+            delete pvtCache[url]
+          })
+          return task
+        }
+        function absolutize(url) {
+          try {
+            return new URL(url, document.baseURI).href
+          } catch (e) {
+            return url
+          }
+        }
+
+        // ---- Motion Photo 解包器（远端 CDN 直连的 Google Motion Photo）----
+        // 文件结构：JPEG 封面 + 文件尾部内嵌 MP4。EXIF 里 GCamera:MicroVideoOffset
+        // 记录的是「从文件末尾往回数多少字节到视频开头」（即视频体积）。
+        // 算法与 HeoLivePhoto 内部 extractMotionFromBuffer 一致（灯箱不复用缩略图
+        // 的 blob，保持 DOM 解耦），这里自己解一遍。
+        var motionCache = Object.create(null)
+        function unpackMotion(url) {
+          if (motionCache[url]) return motionCache[url]
+          var task = fetch(url)
+            .then(function (r) {
+              if (!r.ok) throw new Error('motion HTTP ' + r.status)
+              return r.arrayBuffer()
+            })
+            .then(function (buffer) {
+              var bytes = new Uint8Array(buffer)
+              var head = new TextDecoder().decode(bytes.slice(0, Math.min(bytes.length, 200000)))
+              var m = head.match(/MicroVideoOffset="(\d+)"/)
+              var offset = m ? parseInt(m[1], 10) : null
+              var videoStart = -1
+              if (offset && offset > 0 && offset < bytes.length) {
+                videoStart = bytes.length - offset
+                for (var d = -4; d <= 4; d++) {
+                  var p = videoStart + d
+                  if (
+                    p >= 0 &&
+                    p + 7 < bytes.length &&
+                    bytes[p + 4] === 0x66 &&
+                    bytes[p + 5] === 0x74 &&
+                    bytes[p + 6] === 0x79 &&
+                    bytes[p + 7] === 0x70
+                  ) {
+                    videoStart = p
+                    break
+                  }
+                }
+              } else {
+                for (var i = 0; i < bytes.length - 10; i++) {
+                  if (bytes[i] === 0xff && bytes[i + 1] === 0xd9) {
+                    for (var j = i + 2; j < Math.min(i + 100, bytes.length); j++) {
+                      if (
+                        j + 7 < bytes.length &&
+                        bytes[j + 4] === 0x66 &&
+                        bytes[j + 5] === 0x74 &&
+                        bytes[j + 6] === 0x79 &&
+                        bytes[j + 7] === 0x70
+                      ) {
+                        videoStart = j - 4
+                        break
+                      }
+                    }
+                    if (videoStart !== -1) break
+                  }
+                }
+              }
+              if (videoStart < 0) throw new Error('不是 Motion Photo（未找到内嵌视频）')
+              var eoi = -1
+              for (var k = videoStart - 2; k >= Math.max(0, videoStart - 100000); k--) {
+                if (bytes[k] === 0xff && bytes[k + 1] === 0xd9) {
+                  eoi = k + 2
+                  break
+                }
+              }
+              if (eoi < 0) eoi = videoStart
+              if (videoStart < eoi) videoStart = eoi
+              var cover = bytes.slice(0, eoi)
+              var video = bytes.slice(videoStart)
+              if (
+                cover.length < 1024 ||
+                video.length < 1024 ||
+                cover[0] !== 0xff ||
+                cover[1] !== 0xd8 ||
+                video[4] !== 0x66 ||
+                video[5] !== 0x74
+              ) {
+                throw new Error('Motion Photo 结构不完整')
+              }
+              return {
+                cover: URL.createObjectURL(new Blob([cover], { type: 'image/jpeg' })),
+                video: URL.createObjectURL(new Blob([video], { type: 'video/mp4' })),
+              }
+            })
+          motionCache[url] = task
+          task.catch(function () {
+            delete motionCache[url]
+          })
+          return task
+        }
+
+        // ---- 实况播放器生命周期 ----
+        var activePlayers = []
+        var currentPlayer = null
+        function isCurrentSlide(player) {
+          return !!(player.closest && player.closest('.is-selected'))
+        }
+        function showSpin(player) {
+          if (player.querySelector('.lp-spin')) return
+          var s = document.createElement('div')
+          s.className = 'lp-spin'
+          player.append(s)
+        }
+        function hideSpin(player) {
+          var s = player.querySelector('.lp-spin')
+          if (s) s.parentNode.removeChild(s)
+        }
+        function setCover(player, url, caption) {
+          var img = player.querySelector('.lp-cover')
+          if (!img) {
+            img = document.createElement('img')
+            img.className = 'lp-cover'
+            img.alt = ''
+            player.insertBefore(img, player.firstChild)
+          }
+          if (img.getAttribute('src') !== url) img.setAttribute('src', url)
+          if (caption && !player.querySelector('.lp-caption')) {
+            var c = document.createElement('div')
+            c.className = 'lp-caption'
+            c.textContent = caption
+            player.append(c)
+          }
+        }
+        function attachVideo(player, url) {
+          var node = document.createElement('video')
+          node.className = 'lp-video is-waiting'
+          node.muted = true
+          node.setAttribute('muted', '')
+          node.setAttribute('autoplay', '')
+          node.setAttribute('loop', '')
+          node.setAttribute('playsinline', '')
+          node.playsInline = true
+          node.loop = true
+          node.preload = 'auto'
+          node.src = url
+          node.addEventListener('canplay', function onReady() {
+            node.removeEventListener('canplay', onReady)
+            node.classList.remove('is-waiting')
+            hideSpin(player)
+          })
+          node.addEventListener('error', function () {
+            hideSpin(player)
+          })
+          player.append(node)
+          var record = { player: player, video: node }
+          activePlayers.push(record)
+          if (isCurrentSlide(player)) {
+            var p = node.play()
+            if (p && p.catch) p.catch(function () {})
+          }
+        }
+        function resumeVideo(record) {
+          if (
+            !activePlayers.some(function (r) {
+              return r.player === record.player
+            })
+          )
+            activePlayers.push(record)
+          record.video.classList.add('is-waiting')
+          showSpin(record.player)
+          try {
+            record.video.currentTime = 0
+          } catch (e) {}
+          var p = record.video.play()
+          if (p && p.catch)
+            p.then(
+              function () {
+                record.video.classList.remove('is-waiting')
+                hideSpin(record.player)
+              },
+              function () {
+                record.video.classList.remove('is-waiting')
+                hideSpin(record.player)
+              },
+            )
+        }
+        function stopPlayer(record) {
+          try {
+            if (record.video) {
+              record.video.pause()
+              record.video.removeAttribute('autoplay')
+            }
+          } catch (e) {}
+          hideSpin(record.player)
+        }
+        function prunePlayers() {
+          for (var i = activePlayers.length - 1; i >= 0; i--) {
+            var r = activePlayers[i]
+            var keep =
+              r.player.isConnected && (r.player === currentPlayer || isCurrentSlide(r.player))
+            if (!keep) {
+              stopPlayer(r)
+              activePlayers.splice(i, 1)
+            }
+          }
+        }
+        function stopAll() {
+          activePlayers.forEach(stopPlayer)
+          activePlayers.length = 0
+          currentPlayer = null
+        }
+
+        // 从触发元素 dataset 读素材（DOM 解耦：绝不读缩略图 DOM）
+        function getAssets(slide) {
+          var el = slide && slide.triggerEl
+          var ds = el && el.dataset ? el.dataset : {}
+          return {
+            cover: ds.cover || slide.cover || null,
+            video: ds.video || slide.video || null,
+            pvt: ds.pvt || slide.pvt || null,
+            motion: ds.motion || slide.motion || null,
+            caption: ds.caption || slide.caption || '',
+          }
+        }
+        function resolveAssets(assets) {
+          var coverAbs = assets.cover ? absolutize(assets.cover) : null
+          if (assets.video)
+            return Promise.resolve({ cover: coverAbs, video: absolutize(assets.video) })
+          if (assets.pvt)
+            return unpackPvt(absolutize(assets.pvt)).then(function (p) {
+              return { cover: p.cover || coverAbs, video: p.video }
+            })
+          if (assets.motion)
+            return unpackMotion(absolutize(assets.motion)).then(function (p) {
+              return { cover: p.cover || coverAbs, video: p.video }
+            })
+          return Promise.resolve({ cover: coverAbs, video: null })
+        }
+        // 灯箱一开就暂停缩略图上的 Heo 播放（避免在遮罩底下继续跑）
+        function pauseThumb(slide) {
+          try {
+            var el = slide && slide.triggerEl
+            var img = el && el.querySelector('img.live-photo')
+            if (img && img.parentNode && img.parentNode._heoLiveCtrl)
+              window.HeoLivePhoto.reset(img.parentNode)
+          } catch (e) {}
+        }
+        function mountLivePlayer(player, slide) {
+          pauseThumb(slide)
+          var existing = player.querySelector('.lp-video')
+          if (existing) {
+            resumeVideo({ player: player, video: existing })
+            return
+          }
+          var assets = getAssets(slide)
+          // 有 data-pvt 或 data-motion 时不预铺 cover：解包器自己出封面（同一份
+          // 字节已缓存），避免先下原图再加下解包件
+          if (!assets.pvt && !assets.motion && assets.cover)
+            setCover(player, absolutize(assets.cover), assets.caption)
+          showSpin(player)
+          resolveAssets(assets)
+            .then(function (r) {
+              if (!player.isConnected) return
+              if (r.cover) setCover(player, r.cover, assets.caption)
+              if (r.video) attachVideo(player, r.video)
+              else hideSpin(player)
+            })
+            .catch(function (e) {
+              // pvt 解包失败时回退到 data-cover（原图 jpg）
+              if (assets.cover) setCover(player, absolutize(assets.cover), assets.caption)
+              hideSpin(player)
+              console.warn('[live-gallery] 实况素材加载失败：', e)
+            })
+        }
+        // contentReady / attachSlideEl 入口：扫描参数找带 .el 的 slide
+        function activateSlide() {
+          for (var i = 0; i < arguments.length; i++) {
+            var candidate = arguments[i]
+            if (!candidate || !candidate.el || !candidate.el.querySelector) continue
+            var player = candidate.el.querySelector('.lp-player')
+            if (!player) continue // 非实况 slide（无骨架）→ 跳过，走默认 image 灯箱
+            currentPlayer = player
+            mountLivePlayer(player, candidate)
+            break
+          }
+          prunePlayers()
+        }
+
+        // ---- 时长隔离（移动端长按 vs 短点击，只对实况项起作用）----
+        // 三种实况形态：pvt（本地包）、motion（远端单文件）、video（封面/视频分离）
+        var LIVE_SEL =
+          '[data-fancybox][data-pvt], [data-fancybox][data-motion], [data-fancybox][data-video]'
+        var touchStartAt = 0,
+          touchMoved = false,
+          suppressNextClick = false
+        document.addEventListener(
+          'touchstart',
+          function (e) {
+            if (!e.target.closest || !e.target.closest(LIVE_SEL)) return
+            touchStartAt = Date.now()
+            touchMoved = false
+          },
+          { passive: true, capture: true },
+        )
+        document.addEventListener(
+          'touchmove',
+          function () {
+            touchMoved = true
+          },
+          { passive: true, capture: true },
+        )
+        ;['touchend', 'touchcancel'].forEach(function (t) {
+          document.addEventListener(
+            t,
+            function (e) {
+              if (!e.target.closest || !e.target.closest(LIVE_SEL)) return
+              if (touchStartAt && Date.now() - touchStartAt >= 300 && !touchMoved)
+                suppressNextClick = true
+              touchStartAt = 0
+            },
+            { passive: true, capture: true },
+          )
+        })
+        document.addEventListener(
+          'click',
+          function (e) {
+            if (!suppressNextClick) return
+            suppressNextClick = false
+            if (!e.target.closest || !e.target.closest(LIVE_SEL)) return
+            e.preventDefault()
+            e.stopPropagation()
+          },
+          true,
+        )
+
+        // ---- Fancybox 初始化 ----
+        function initFancybox() {
+          if (typeof Fancybox === 'undefined') return
+          if (!document.querySelector('[data-fancybox]')) return
+          try {
+            Fancybox.unbind(document.body)
+          } catch (e) {}
+          // 给实况项注入空骨架 data-html（Fancybox 据此把骨架渲染进 slide 并触发
+          // Carousel.contentReady；JS 设避免 SSR 属性转义问题）
+          document
+            .querySelectorAll(
+              '[data-fancybox][data-pvt]:not([data-html]), [data-fancybox][data-motion]:not([data-html]), [data-fancybox][data-video]:not([data-html])',
+            )
+            .forEach(function (el) {
+              el.setAttribute('data-html', '<div class="lp-player"></div>')
+            })
+          // 文章页普通图片：<img data-fancybox> 上无 href/data-src，Fancybox 取不到
+          // 大图源。运行时用 img 的最终 src（Astro 图片优化已改写成 /_astro/x.hash.webp）
+          // 补 data-src。currentSrc 优先（响应 srcset 选中的图），回退 src 属性。
+          // 选择器限定 img[data-fancybox]:not([data-src]) —— 相册实况项的 data-* 在 <a>
+          // 上、相册静态项 img 无 data-fancybox，均不会误伤。
+          document.querySelectorAll('img[data-fancybox]:not([data-src])').forEach(function (img) {
+            var src = img.currentSrc || img.getAttribute('src') || ''
+            if (src) img.setAttribute('data-src', src)
+          })
+          Fancybox.bind('[data-fancybox]', {
+            touch: { vertical: true },
+            Carousel: { infinite: true },
+            preload: 1,
+            Caption: { type: 'auto' },
+            Toolbar: { display: { infobar: true, close: true } },
+            Keyboard: { horizontal: true, vertical: true },
+            backdrop: true,
+            on: {
+              'Carousel.contentReady': activateSlide,
+              'Carousel.attachSlideEl': activateSlide,
+              'Carousel.change': function () {
+                prunePlayers()
+              },
+              'Carousel.settle': function () {
+                prunePlayers()
+              },
+              backdropClick: function (_fancybox, event) {
+                var t = event.composedPath ? event.composedPath()[0] : event.target
+                if (t && t.closest && t.closest('.lp-player')) event.preventDefault()
+              },
+              close: stopAll,
+              destroy: stopAll,
+            },
+          })
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initFancybox)
+        } else {
+          initFancybox()
+        }
+        document.addEventListener('swup:page:view', function () {
+          setTimeout(initFancybox, 200)
+        })
+        document.addEventListener('astro:page-load', function () {
+          setTimeout(initFancybox, 200)
+        })
+      })()
+    </script>
+    <!-- LivePhoto 实况照片支持 -->
+    <script is:inline src="/livephoto/heolivephoto.js" defer></script>
+    <!-- HeoLivePhoto 自身只在 DOMContentLoaded 扫一次（但已打补丁去掉自动 scan），
+         所以全靠这里按需懒加载：切页后对页内 [data-live-pvt] / [data-live-motion]
+         项逐个 IntersectionObserver observe，滚进视口（rootMargin:0，不预取）才
+         scan(item) 只增强那一张 → 真·懒加载，不再一次性拉全部素材。
+         并发上限 MAX_CONCURRENT=2（12 个 .pvt 共 ~16.7MB 并发下载会把带宽和 CPU
+         同时打满）；generation token 让切页后旧队列立即作废。
+         标 data-swup-ignore-script：监听器挂 document，Swup 永不替换；
+         不加会被每切一次页克隆重跑、监听器无限累加。 -->
+    <script is:inline data-swup-ignore-script>
+      ;(function () {
+        var observer = null
+        /* 并发上限：无限制地逐个 scan 会让 12 个 .pvt（1-2.6MB/个）同时下载+解压，
+           既打满带宽又把 CPU 占满（页面卡死）。 */
+        var MAX_CONCURRENT = 2
+        var queue = []
+        var active = 0
+        /* generation 递增：切页后旧队列立即作废，不再追加新下载（防止切到别的页面
+           后还在后台拉 16MB .pvt，拖慢新页面）。 */
+        var generation = 0
+        function scanItem(item, done) {
+          if (typeof HeoLivePhoto === 'undefined' || !HeoLivePhoto.scan) return done()
+          try {
+            var r = HeoLivePhoto.scan(item)
+            if (r && r.then) r.then(done, done)
+            else done()
+          } catch (e) {
+            done()
+          }
+        }
+        function setup() {
+          generation++
+          var gen = generation
+          queue = []
+          active = 0
+          var liveImgs = document.querySelectorAll(
+            'img[data-live-pvt], img[data-live-motion], img[data-live-video]',
+          )
+          if (!liveImgs.length) return
+          // 切页后旧 observer 失效，重建
+          if (observer) observer.disconnect()
+          if (!('IntersectionObserver' in window)) {
+            // 不支持 IO 的浏览器直接全量初始化
+            liveImgs.forEach(function (img) {
+              var item = img.closest('[data-fancybox]') || img.parentElement
+              if (item) scanItem(item, function () {})
+            })
+            return
+          }
+          // 出队：同时最多 MAX_CONCURRENT 个 .pvt 在下载/解压，其余排队
+          function flush() {
+            if (gen !== generation) return
+            while (active < MAX_CONCURRENT && queue.length) {
+              var item = queue.shift()
+              active++
+              scanItem(item, function () {
+                if (gen !== generation) return
+                active--
+                flush()
+              })
+            }
+          }
+          observer = new IntersectionObserver(
+            function (entries) {
+              if (gen !== generation) return
+              entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return
+                observer.unobserve(entry.target) // 只入队一次
+                queue.push(entry.target)
+              })
+              flush()
+            },
+            {
+              root: null,
+              // rootMargin:0 —— 只解包真正滚进视口的那张。之前 200px 会把首屏全部项
+              // 一次性推入队列并发下载，是页面加载慢的主因。
+              rootMargin: '0px',
+              threshold: 0,
+            },
+          )
+          liveImgs.forEach(function (img) {
+            var item = img.closest('[data-fancybox]') || img.parentElement
+            if (item && !img.dataset.liveReady) observer.observe(item)
+          })
+        }
+        document.addEventListener('swup:page:view', function () {
+          setTimeout(setup, 200)
+        })
+        document.addEventListener('astro:page-load', function () {
+          setTimeout(setup, 200)
+        })
+        if (document.readyState === 'loading')
+          document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(setup, 0)
+          })
+        else setTimeout(setup, 0)
+      })()
+    </script>
+    <!-- 全站搜索模态框（Pagefind UI，body 级常驻，Swup 不替换） -->
+    <SearchModal />
+  </body>
+</html>

@@ -1,0 +1,69 @@
+---
+import type { CollectionEntry } from 'astro:content'
+import { RelativeDate } from './RelativeDate'
+import ReadCount from './ReadCount.astro'
+import { getPostUrl } from '@/utils/content'
+
+interface Props {
+  entry: CollectionEntry<'posts'>
+  index: number
+}
+
+const { entry } = Astro.props
+const { remarkPluginFrontmatter } = await entry.render()
+const { title, date, summary, cover, category, sticky } = entry.data
+---
+
+<article class="group card-glass cursor-target">
+  <!-- 鼠标跟随径向高光（--mouse-x/--mouse-y 由 PostList 脚本注入） -->
+  <div class="card-glow-effect" aria-hidden="true"></div>
+  <a href={getPostUrl(entry)} class="flex flex-col">
+    {
+      cover && (
+        <div class="card-cover-mobile-hidden w-full aspect-[21/9] max-h-[220px] overflow-hidden">
+          <img
+            class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500 will-change-transform select-none"
+            src={cover}
+            alt={title}
+            loading="lazy"
+          />
+        </div>
+      )
+    }
+    <div
+      class="card-content flex-1 min-w-0 p-5 sm:p-6 flex flex-col justify-center gap-2 sm:gap-2.5"
+    >
+      <div class="flex items-center gap-2 flex-wrap">
+        {
+          category && (
+            <span class="category-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent">
+              {category}
+            </span>
+          )
+        }
+        {sticky > 0 && <i class="text-red-500 iconfont icon-pushpin text-sm" title="置顶" />}
+      </div>
+      <h3
+        class="post-title text-lg sm:text-xl font-semibold tracking-tight leading-snug line-clamp-2"
+      >
+        {title}
+      </h3>
+      {
+        summary && (
+          <p class="post-summary text-sm text-secondary leading-relaxed line-clamp-2">{summary}</p>
+        )
+      }
+      <div class="post-meta flex items-center gap-3 text-xs text-secondary tabular-nums">
+        <div class="flex items-center gap-1">
+          <i class="iconfont icon-calendar"></i>
+          <RelativeDate date={date} client:idle />
+        </div>
+        <div class="flex items-center gap-1">
+          <i class="iconfont icon-timer"></i>
+          <span>{Math.ceil(remarkPluginFrontmatter.readingMinutes)} 分钟</span>
+        </div>
+        <ReadCount postPath={getPostUrl(entry)} postTitle={title} class="flex items-center gap-1" />
+      </div>
+    </div>
+  </a>
+</article>

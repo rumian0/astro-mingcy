@@ -1,0 +1,13 @@
+---
+import { hero } from '@/config.json'
+---
+
+<div class="sidebar-card p-5">
+  <div class="sidebar-title">今日一言</div>
+  <blockquote class="m-0 text-sm leading-relaxed text-secondary">
+    <span class="mr-1 text-accent">“</span>
+    {hero.yiyan}
+    <span class="ml-1 text-accent">”</span>
+  </blockquote>
+  {hero.bio && <p class="mt-2 text-right text-xs text-secondary/80">— {hero.bio}</p>}
+</div>

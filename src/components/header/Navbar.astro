@@ -1,0 +1,1214 @@
+---
+// ============================================================================
+// Navbar.astro —— 双胶囊悬浮式顶部导航（复刻 blog.liushen.fun 设计）
+//
+// 设计语言（1:1 对照参考站 Header）：
+//   ① 两个独立浮起胶囊：Logo 单独一个胶囊（左），导航菜单 + 功能按钮
+//      单独一个胶囊（右）—— 默认态完全透明无边框，滚动时各自浮现玻璃
+//      背景 + 边框 + 投影并整体下移 .35rem，实现「Logo 与导航分开」的观感
+//   ② 滑动特效：`.glide-pill` 不是 CSS transition，而是 requestAnimationFrame
+//      驱动的弹簧物理（stiffness 7000 / damping 96），逐帧写入
+//      translate3d + width + height，hover 移动时带过冲与余震
+//   ③ 二级菜单：胶囊形玻璃下拉（border-radius 999px + backdrop-filter 18px），
+//      内部同样内嵌 glide-pill，active 项用波浪下划线标识
+//   ④ 浅深随心切换：全部颜色走本站 CSS 变量（--color-accent / --color-text-primary
+//      / --color-border-primary / --color-bg-primary），主题切换时自动适配，
+//      无一处硬编码颜色
+//
+// 保留的本地约定：
+//   ① 定位仍用 absolute（默认态）/ fixed（滚动态），不改 main 的 pt-16，
+//      避免全站布局回归；参考站的视觉由两个胶囊承载，与定位方式无关
+//   ② `data-swup-ignore-script` + `window.__gyozaNavbarInit` 幂等守卫，
+//      防止 SwupScriptsPlugin 每切一页克隆重跑、监听器无限累加
+// ============================================================================
+
+type NavLink = { label: string; href: string; external?: boolean }
+type NavGroup = { label: string; items: NavLink[] }
+type NavItem = NavLink | NavGroup
+
+const NAV_LINKS: NavItem[] = [
+  {
+    label: '导航',
+    items: [
+      { label: '首页', href: '/' },
+      { label: '项目', href: '/projects' },
+      { label: '工具', href: '/tools' },
+    ],
+  },
+  {
+    label: '整理',
+    items: [
+      { label: '归档', href: '/archives' },
+      { label: '标签', href: '/tags' },
+      { label: '分类', href: '/categories' },
+    ],
+  },
+  { label: '相册', href: '/galleries' },
+  {
+    label: '友人',
+    items: [
+      { label: '友链展示', href: '/links' },
+      { label: '友链申请', href: '/links/apply' },
+      { label: '朋友动态', href: '/links/fcircle' },
+    ],
+  },
+  { label: '关于', href: '/about' },
+]
+
+const path = Astro.url.pathname
+
+// 判断当前页是否命中某个菜单项（/ 精确匹配，其余前缀匹配含 /）
+function isActive(href: string): boolean {
+  // 外链永远不参与站内高亮判断，避免 startsWith 误命中
+  if (/^https?:\/\//.test(href)) return false
+  return href === '/' ? path === '/' : path === href || path.startsWith(href + '/')
+}
+
+// 分组命中：任一子项命中即高亮分组
+function isGroupActive(items: NavLink[]): boolean {
+  return items.some((i) => isActive(i.href))
+}
+---
+
+<header id="site-navbar" class="navbar">
+  <div class="navbar__filter">
+    <div class="navbar__layout">
+      <div id="navbar-wrap" class="navbar__wrap">
+        <!-- 左胶囊：Logo 独立浮起 -->
+        <div class="navbar__float navbar__float-left">
+          <a href="/" class="navbar__logo group" aria-label="Ming{·}CY，回到首页">
+            <svg class="logo-svg" viewBox="0 0 800 250" aria-hidden="true">
+              <g transform="matrix(1.112155, 0, 0, 1.112155, 12.50231, -14.050506)" id="object-0">
+                <text
+                  class="logo-text-left"
+                  style="font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 150px; font-weight: 600; letter-spacing: -0.04em; white-space: pre;"
+                  x="0"
+                  y="176.957">Ming</text
+                >
+                <text
+                  class="logo-sphere"
+                  style="font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 150px; font-weight: 600; letter-spacing: -30px; paint-order: stroke; white-space: pre;"
+                  x="360"
+                  y="176.957">·</text
+                >
+                <text
+                  class="logo-text-right"
+                  style="font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; font-size: 150px; font-weight: 600; letter-spacing: -0.04em; white-space: pre;"
+                  x="500"
+                  y="176.957">CY</text
+                >
+              </g>
+            </svg>
+          </a>
+        </div>
+
+        <!-- 右胶囊：导航菜单 + 功能按钮 -->
+        <nav id="nav-menu" class="navbar__float navbar__float-right" aria-label="主导航">
+          <ul class="navbar__menu" data-glide-track>
+            <!-- hover 高亮药丸：位置由 runtime 逐帧写入 -->
+            <li class="glide-pill" data-glide-pill aria-hidden="true"></li>
+            {
+              NAV_LINKS.map((item) =>
+                'href' in item ? (
+                  <li class="navbar__item">
+                    <a
+                      href={item.href}
+                      class:list={['navbar__link', { 'nav-active': isActive(item.href) }]}
+                      data-glide-item
+                    >
+                      {item.label}
+                    </a>
+                  </li>
+                ) : (
+                  <li class="navbar__item">
+                    <button
+                      type="button"
+                      class:list={[
+                        'navbar__link',
+                        'navbar__trigger',
+                        { 'nav-active': isGroupActive(item.items) },
+                      ]}
+                      data-glide-item
+                      aria-haspopup="true"
+                      aria-expanded="false"
+                    >
+                      <span>{item.label}</span>
+                    </button>
+                    <ul class="navbar__dropdown" data-glide-track>
+                      <li class="glide-pill" data-glide-pill aria-hidden="true" />
+                      {item.items.map((sub) => (
+                        <li>
+                          <a
+                            href={sub.href}
+                            target={sub.external ? '_blank' : undefined}
+                            rel={sub.external ? 'noopener noreferrer' : undefined}
+                            class:list={[
+                              'navbar__dropdown-link',
+                              { 'nav-active': isActive(sub.href) },
+                            ]}
+                            data-glide-item
+                          >
+                            {sub.label}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ),
+              )
+            }
+            <!-- 分隔线 -->
+            <li class="navbar__sep" aria-hidden="true">
+              <span class="navbar__sep-line"></span>
+            </li>
+          </ul>
+
+          <button type="button" id="search-btn" class="navbar__icon-btn" aria-label="搜索">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              width="1.05rem"
+              height="1.05rem"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.3-4.3"></path>
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            id="menu-btn"
+            class="navbar__icon-btn navbar__burger"
+            aria-label="打开菜单"
+            aria-expanded="false"
+            aria-controls="navbar-drawer"
+          >
+            <svg
+              class="navbar__burger-open"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              width="1.05rem"
+              height="1.05rem"
+              aria-hidden="true"
+            >
+              <line x1="4" x2="20" y1="6" y2="6"></line>
+              <line x1="4" x2="20" y1="12" y2="12"></line>
+              <line x1="4" x2="20" y1="18" y2="18"></line>
+            </svg>
+            <svg
+              class="navbar__burger-close"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              width="1.05rem"
+              height="1.05rem"
+              aria-hidden="true"
+            >
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </nav>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- 移动端汉堡抽屉面板（<1024px 显示） -->
+<div id="navbar-drawer" class="navbar__drawer" aria-hidden="true">
+  <nav class="navbar__drawer-inner" aria-label="移动端导航">
+    {
+      NAV_LINKS.map((item) =>
+        'href' in item ? (
+          <a
+            href={item.href}
+            class:list={['navbar__drawer-link', { 'nav-active': isActive(item.href) }]}
+          >
+            {item.label}
+          </a>
+        ) : (
+          <details class="navbar__drawer-group" open={isGroupActive(item.items) ? true : undefined}>
+            <summary class="navbar__drawer-title">
+              <span>{item.label}</span>
+              <svg
+                class="navbar__drawer-chevron"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                width="1rem"
+                height="1rem"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
+            {item.items.map((sub) => (
+              <a
+                href={sub.href}
+                target={sub.external ? '_blank' : undefined}
+                rel={sub.external ? 'noopener noreferrer' : undefined}
+                class:list={[
+                  'navbar__drawer-link',
+                  'navbar__drawer-link--sub',
+                  { 'nav-active': isActive(sub.href) },
+                ]}
+              >
+                {sub.label}
+              </a>
+            ))}
+          </details>
+        ),
+      )
+    }
+  </nav>
+</div>
+
+<style>
+  /* ============ Header 壳：自身永远无背景，视觉全部由胶囊承载 ============ */
+  .navbar {
+    /* 玻璃层变量：降级为实色，支持 color-mix 时切为半透明 */
+    --navbar-glass-bg: rgb(var(--color-bg-primary));
+    --navbar-glass-popover: rgb(var(--color-bg-primary));
+
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    isolation: isolate;
+    transform-origin: top;
+    background: 0 0;
+    overflow: visible;
+  }
+  @supports (color: color-mix(in lab, red, red)) {
+    .navbar {
+      --navbar-glass-bg: color-mix(in srgb, rgb(var(--color-bg-primary)) 72%, transparent);
+      --navbar-glass-popover: color-mix(in srgb, rgb(var(--color-bg-primary)) 78%, transparent);
+    }
+  }
+
+  /* 滚动态：header 仍为透明壳，不响应点击（中间空白穿透到内容），
+     胶囊单独恢复并下移 .35rem —— 胶囊位置与默认态基本一致，避免跳动 */
+  .navbar.is-scrolled {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    pointer-events: none;
+  }
+
+  /* ============ 玻璃层容器 + 限宽布局 ============ */
+  .navbar__filter {
+    position: relative;
+    z-index: 45;
+    width: 100%;
+  }
+  .navbar__layout {
+    width: 100%;
+    max-width: 950px;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+  @media (min-width: 1280px) {
+    .navbar__layout {
+      max-width: 1100px;
+    }
+  }
+
+  /* ============ 两端布局 ============ */
+  .navbar__wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-width: 0;
+    gap: 0.5rem;
+    padding: 0.75rem 0;
+    transition: all 0.3s;
+  }
+  @media (min-width: 640px) {
+    .navbar__wrap {
+      padding: 1.25rem 0;
+      gap: 1rem;
+    }
+  }
+
+  /* ============ 浮起胶囊（两个独立胶囊的核心）============ */
+  .navbar__float {
+    isolation: isolate;
+    background: 0 0;
+    border: 1px solid #0000;
+    border-radius: 999px;
+    min-height: 2.75rem;
+    padding: 0.28rem 0.45rem;
+    padding-inline: 0.35rem;
+    position: relative;
+    transform: translateY(0);
+    transition:
+      border-color 0.25s,
+      box-shadow 0.25s,
+      transform 0.25s;
+  }
+  /* 玻璃层：默认隐藏，滚动时浮现。
+     blur 12px 而不是 18px —— 小区域上的高斯模糊半径超过内容时收益递减，
+     但每帧重采样成本线性上升（滚动时最明显） */
+  .navbar__float::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--navbar-glass-bg);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, rgb(var(--color-text-primary)) 10%, transparent);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .navbar.is-scrolled .navbar__float {
+    pointer-events: auto;
+    border-color: color-mix(in srgb, rgb(var(--color-border-primary)) 24%, transparent);
+    transform: translateY(0.35rem);
+    box-shadow:
+      0 12px 30px -24px #00000066,
+      0 3px 10px -8px #00000040;
+  }
+  .navbar.is-scrolled .navbar__float::before {
+    opacity: 1;
+  }
+
+  /* 左胶囊：Logo —— 紧凑化覆盖（同一选择器级、声明在后，压过 .navbar__float 的默认值）
+     上下内边距 0.28→0.1rem 收紧；圆角 999px→16px 由「全圆胖胶囊」改「修长圆角胶囊」；
+     min-height 刻意保持 2.75rem，与右胶囊视觉重心一致 */
+  .navbar__float-left {
+    position: relative;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex-shrink: 0;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.1rem 0.55rem;
+    padding-inline: 0.55rem;
+    border-radius: 16px;
+  }
+
+  /* 右胶囊：菜单 + 按钮 */
+  .navbar__float-right {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex-shrink: 0;
+    gap: 0.25rem;
+  }
+
+  /* ============ Logo：Ming{·}CY SVG（hover 字块外移 + 圆球摇摆）============ */
+  .navbar__logo {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .logo-svg {
+    /* 9.375rem → 7rem：配合 viewBox 裁掉右侧 20% 空白后，字形高度仍 ≈20px 不变 */
+    width: 7rem;
+    height: auto;
+  }
+  /* Logo 配色：亮色深灰文字 + 暗红圆球；暗色近白文字 + 亮红圆球
+     （去掉 dark:invert 反色——反色会让圆球变青蓝、丢失品牌红，且整体偏灰对比弱） */
+  .logo-text-left,
+  .logo-text-right {
+    fill: rgb(51, 51, 51);
+    transition:
+      transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+      filter 0.4s ease,
+      fill 0.3s ease;
+  }
+  .logo-sphere {
+    fill: rgb(167, 90, 90);
+    transition:
+      transform 0.3s ease,
+      filter 0.3s ease,
+      fill 0.3s ease;
+    transform-origin: 342px 130px;
+  }
+  html[data-theme='dark'] .logo-text-left,
+  html[data-theme='dark'] .logo-text-right {
+    fill: rgb(235, 238, 242);
+  }
+  html[data-theme='dark'] .logo-sphere {
+    fill: rgb(224, 120, 120);
+  }
+  /* SVG 内 CSS transform 走 user 单位：viewBox 800 渲染到 112px 时
+     1 user unit = 0.14 CSS px，故 36 单位 ≈ 5 CSS px（原 5 单位只渲染 0.7px，效果几乎不可见） */
+  .navbar__logo:hover .logo-text-left {
+    transform: translateX(-36px);
+    filter: drop-shadow(0 0 3px rgba(56, 66, 77, 0.2));
+  }
+  .navbar__logo:hover .logo-text-right {
+    transform: translateX(36px);
+    filter: drop-shadow(0 0 3px rgba(56, 66, 77, 0.2));
+  }
+  .navbar__logo:hover .logo-sphere {
+    filter: drop-shadow(0 0 8px rgba(167, 90, 90, 0.5));
+    animation: logo-sphere-wiggle 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @keyframes logo-sphere-wiggle {
+    0% {
+      transform: rotate(0deg) scale(1);
+    }
+    20% {
+      transform: rotate(-8deg) scale(1.1);
+    }
+    40% {
+      transform: rotate(5deg) scale(1.15);
+    }
+    60% {
+      transform: rotate(-3deg) scale(1.12);
+    }
+    80% {
+      transform: rotate(1deg) scale(1.05);
+    }
+    100% {
+      transform: rotate(0deg) scale(1);
+    }
+  }
+
+  /* ============ 菜单（<1024px 隐藏，交给汉堡抽屉）============ */
+  .navbar__menu {
+    position: relative;
+    overflow: visible;
+    display: none;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .navbar__item {
+    position: relative;
+  }
+
+  /* ============ 菜单项 ============ */
+  .navbar__link {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid #0000;
+    border-radius: 999px;
+    background: 0 0;
+    color: rgb(var(--color-text-primary));
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.2s;
+  }
+  .navbar__link:hover,
+  .navbar__link:focus-visible {
+    color: rgb(var(--color-accent));
+  }
+  .navbar__link:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, rgb(var(--color-accent)) 50%, transparent);
+  }
+  /* 当前页：波浪下划线标识（替代高亮块） */
+  .navbar__link.nav-active {
+    color: rgb(var(--color-accent));
+    background: 0 0;
+    text-decoration: underline wavy 0.08em;
+    text-underline-offset: 0.42em;
+  }
+  .navbar__link.nav-active::after {
+    content: none;
+  }
+
+  /* ============ 滑动药丸：rAF 弹簧物理逐帧驱动 ============ */
+  .glide-pill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    width: 0;
+    height: 0;
+    border: 1px solid rgb(var(--color-accent));
+    border-radius: 999px;
+    background: rgb(var(--color-accent));
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s;
+    list-style: none;
+  }
+  @supports (color: color-mix(in lab, red, red)) {
+    .glide-pill {
+      border-color: color-mix(in srgb, rgb(var(--color-accent)) 24%, transparent);
+      background: color-mix(in srgb, rgb(var(--color-accent)) 8%, transparent);
+    }
+  }
+  .glide-pill.is-active {
+    opacity: 1;
+  }
+
+  /* ============ 二级菜单：胶囊玻璃下拉 ============ */
+  .navbar__dropdown {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    width: max-content;
+    max-width: min(92vw, 820px);
+    margin: 0.25rem 0 0;
+    padding: 0.4rem 0.55rem;
+    list-style: none;
+    border: 1px solid color-mix(in srgb, rgb(var(--color-border-primary)) 24%, transparent);
+    border-radius: 999px;
+    background: var(--navbar-glass-popover);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    box-shadow: 0 12px 30px -20px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(-50%, 0.35rem);
+    transition:
+      opacity 0.2s,
+      visibility 0.2s,
+      transform 0.2s;
+  }
+  /* 顶部悬浮间隙：避免鼠标离开触发器时下拉立即消失 */
+  .navbar__dropdown::before {
+    content: '';
+    position: absolute;
+    top: -0.5rem;
+    left: 0;
+    right: 0;
+    height: 0.5rem;
+  }
+  .navbar__item:hover > .navbar__dropdown,
+  .navbar__item:focus-within > .navbar__dropdown {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate(-50%, 0);
+  }
+
+  .navbar__dropdown-link {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    border: 1px solid #0000;
+    border-radius: 999px;
+    color: rgb(var(--color-text-primary));
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .navbar__dropdown-link:hover,
+  .navbar__dropdown-link:focus-visible {
+    color: rgb(var(--color-accent));
+    outline: none;
+  }
+  .navbar__dropdown-link.nav-active {
+    color: rgb(var(--color-accent));
+    background: 0 0;
+    text-decoration: underline wavy 0.08em;
+    text-underline-offset: 0.42em;
+  }
+  .navbar__dropdown-link.nav-active::after {
+    content: none;
+  }
+
+  /* ============ 分隔线 + 功能按钮 ============ */
+  .navbar__sep {
+    display: flex;
+    align-items: center;
+    padding: 0 0.25rem;
+    list-style: none;
+  }
+  .navbar__sep-line {
+    display: block;
+    width: 1px;
+    height: 1rem;
+    background: rgb(var(--color-border-primary) / 0.3);
+  }
+
+  .navbar__icon-btn {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, rgb(var(--color-border-primary)) 18%, transparent);
+    border-radius: 999px;
+    color: rgb(var(--color-text-primary));
+    cursor: pointer;
+    transition:
+      color 0.2s,
+      border-color 0.2s,
+      background-color 0.2s;
+  }
+  .navbar__icon-btn:hover {
+    color: rgb(var(--color-accent));
+    border-color: color-mix(in srgb, rgb(var(--color-accent)) 24%, transparent);
+    background: color-mix(in srgb, rgb(var(--color-accent)) 8%, transparent);
+  }
+  .navbar__icon-btn:focus-visible {
+    outline: none;
+    color: rgb(var(--color-accent));
+    box-shadow: 0 0 0 2px color-mix(in srgb, rgb(var(--color-accent)) 50%, transparent);
+  }
+
+  .navbar__burger-open,
+  .navbar__burger-close {
+    display: block;
+  }
+  .navbar__burger-close {
+    display: none;
+  }
+  .navbar.is-drawer-open .navbar__burger-open {
+    display: none;
+  }
+  .navbar.is-drawer-open .navbar__burger-close {
+    display: block;
+  }
+
+  /* ============ 移动端汉堡抽屉 ============ */
+  .navbar__drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 990;
+    display: none;
+    padding: 5.5rem 1.5rem 1.5rem;
+    /* 内容高于视口时可内部滚动，不会超出屏幕裁掉顶部 */
+    max-height: 100vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background-color: rgb(var(--color-bg-primary) / 0.92);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgb(var(--color-border-primary) / 0.2);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition:
+      opacity 0.25s ease,
+      transform 0.25s ease,
+      visibility 0.25s;
+  }
+  .navbar__drawer.is-open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+  .navbar__drawer-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .navbar__drawer-link {
+    display: block;
+    padding: 0.7rem 0.9rem;
+    color: rgb(var(--color-text-primary));
+    font-size: 1rem;
+    line-height: 1.4;
+    text-decoration: none;
+    border-radius: 0.6rem;
+    transition:
+      background-color 0.15s,
+      color 0.15s;
+  }
+  .navbar__drawer-link:hover {
+    color: rgb(var(--color-accent));
+    background: color-mix(in srgb, rgb(var(--color-accent)) 10%, transparent);
+  }
+  .navbar__drawer-link.nav-active {
+    color: rgb(var(--color-accent));
+  }
+  /* ============ 抽屉分组：原生 details/summary 折叠 ============ */
+  .navbar__drawer-group {
+    border-radius: 0.6rem;
+  }
+  .navbar__drawer-group[open] {
+    background: color-mix(in srgb, rgb(var(--color-bg-secondary)) 35%, transparent);
+  }
+  .navbar__drawer-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.9rem;
+    color: rgb(var(--color-text-secondary));
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    list-style: none; /* Firefox：隐藏默认三角 */
+    border-radius: 0.6rem;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      color 0.15s,
+      background-color 0.15s;
+  }
+  .navbar__drawer-title::-webkit-details-marker {
+    display: none; /* WebKit/Blink：隐藏默认三角 */
+  }
+  .navbar__drawer-title:hover {
+    color: rgb(var(--color-accent));
+    background: color-mix(in srgb, rgb(var(--color-accent)) 8%, transparent);
+  }
+  .navbar__drawer-title:focus-visible {
+    outline: none;
+    color: rgb(var(--color-accent));
+    box-shadow: 0 0 0 2px color-mix(in srgb, rgb(var(--color-accent)) 50%, transparent);
+  }
+  .navbar__drawer-chevron {
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    color: inherit;
+    opacity: 0.55;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .navbar__drawer-group[open] .navbar__drawer-chevron {
+    transform: rotate(180deg);
+  }
+  /* 展开时子项淡入下滑 */
+  .navbar__drawer-group[open] > .navbar__drawer-link--sub {
+    animation: navbar-drawer-sub-in 0.22s ease both;
+  }
+  @keyframes navbar-drawer-sub-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .navbar__drawer-link--sub {
+    padding-left: 1.6rem;
+    font-size: 0.95rem;
+  }
+
+  /* ============ 响应式：<1024px 隐藏横向菜单，显示汉堡 ============ */
+  @media (max-width: 1023px) {
+    .navbar__menu {
+      display: none;
+    }
+    .navbar__burger {
+      display: inline-flex;
+    }
+    .navbar__drawer {
+      display: block;
+    }
+  }
+  @media (min-width: 1024px) {
+    .navbar__burger {
+      display: none;
+    }
+    .navbar__menu {
+      display: flex;
+    }
+  }
+
+  /* ============ 性能降级 ============ */
+  @media (prefers-reduced-motion: reduce) {
+    .logo-text-left,
+    .logo-text-right,
+    .logo-sphere {
+      transition: filter 0.4s ease;
+    }
+    .navbar__logo:hover .logo-sphere {
+      animation: none;
+    }
+    .glide-pill {
+      transition: none;
+    }
+    .navbar__drawer-chevron {
+      transition: none;
+    }
+    .navbar__drawer-group[open] > .navbar__drawer-link--sub {
+      animation: none;
+    }
+  }
+
+  /* 滚动期间彻底拿掉毛玻璃：backdrop-filter 每帧重采样（背景在动）是滚动掉帧的主因，
+     改用更高的纯色不透明度补偿视觉；transition:none 避开回跳 */
+  body.is-scrolling #site-navbar {
+    --navbar-glass-bg: rgb(var(--color-bg-primary) / 0.9);
+  }
+  body.is-scrolling #site-navbar .navbar__float::before {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    transition: none;
+  }
+</style>
+
+<script is:inline data-swup-ignore-script>
+  // 滚动监听（阈值 15px，rAF 节流）+ 滑动药丸弹簧物理 + 汉堡抽屉
+  ;(function () {
+    if (window.__gyozaNavbarInit) return
+    window.__gyozaNavbarInit = true
+
+    var header = document.getElementById('site-navbar')
+    if (!header) return
+
+    // ---------- 滚动状态 ----------
+    var THRESHOLD = 15
+    var ticking = false
+    function update() {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(function () {
+        header.classList.toggle('is-scrolled', window.scrollY > THRESHOLD)
+        ticking = false
+      })
+    }
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('load', update)
+    window.addEventListener('pageshow', update)
+    document.addEventListener('swup:page:view', function () {
+      setTimeout(update, 0)
+    })
+    document.addEventListener('astro:page-load', function () {
+      setTimeout(update, 0)
+    })
+
+    // ---------- 滑动药丸：rAF 弹簧物理（复刻参考站参数）----------
+    var TRACK = '[data-glide-track]'
+    var PILL = '[data-glide-pill]'
+    var ITEM = '[data-glide-item]'
+    var STIFFNESS = 7000 // 弹簧刚度
+    var DAMPING = 96 // 阻尼
+    var TOL_POS = 0.1 // 位置收敛容差 px
+    var TOL_VEL = 0.6 // 速度收敛容差
+    var HIDDEN_SCALE = 0.92 // 隐藏态缩放
+    var MIN_FRAME = 0.002 // 最小帧间隔 s
+    var reduced = null
+
+    function reduceMotion() {
+      if (!reduced) reduced = window.matchMedia('(prefers-reduced-motion: reduce)')
+      return reduced.matches
+    }
+    function round2(n) {
+      return Math.round(n * 100) / 100
+    }
+
+    // 每个 track 一份运动状态
+    function makeState(container) {
+      var pill = container.querySelector(':scope > ' + PILL)
+      if (!pill) return null
+      return {
+        container: container,
+        pill: pill,
+        aimed: null,
+        centerX: { value: 0, velocity: 0 },
+        centerY: { value: 0, velocity: 0 },
+        width: { value: 0, velocity: 0 },
+        height: { value: 0, velocity: 0 },
+        targetCenterX: 0,
+        targetCenterY: 0,
+        targetWidth: 0,
+        targetHeight: 0,
+        visible: false,
+        frame: 0,
+        lastTime: 0,
+      }
+    }
+
+    // 计算目标项相对 track 的位置与尺寸
+    function measure(state, item) {
+      var cRect = state.container.getBoundingClientRect()
+      var iRect = item.getBoundingClientRect()
+      var baseLeft = cRect.left + state.container.clientLeft
+      var baseTop = cRect.top + state.container.clientTop
+      var left = iRect.left - baseLeft
+      var top = iRect.top - baseTop
+      state.targetCenterX = left + iRect.width / 2
+      state.targetCenterY = top + iRect.height / 2
+      state.targetWidth = iRect.width
+      state.targetHeight = iRect.height
+    }
+
+    // 写帧：中心点定位 + 速度方向留白（模拟药丸拖尾）
+    function render(state) {
+      var v = state.centerX.velocity
+      var dir = v > 0 ? 1 : v < 0 ? -1 : 0
+      var lead = Math.min(Math.abs(v) * MIN_FRAME, 10)
+      var w = Math.max(state.width.value, 0)
+      var h = Math.max(state.height.value, 0)
+      var halfW = w / 2
+      var halfH = h / 2
+      var x = state.centerX.value - halfW - (dir > 0 ? lead : 0)
+      var right = state.centerX.value + halfW + (dir < 0 ? lead : 0)
+      var y = state.centerY.value - halfH
+      var scale = state.visible ? 1 : HIDDEN_SCALE
+      state.pill.style.transform =
+        'translate3d(' + round2(x) + 'px, ' + round2(y) + 'px, 0) scale(' + scale + ')'
+      state.pill.style.width = round2(right - x) + 'px'
+      state.pill.style.height = round2(h) + 'px'
+    }
+
+    // 单轴弹簧积分：返回是否已收敛
+    function spring(axis, target, dt) {
+      axis.velocity += (target - axis.value) * STIFFNESS * dt
+      axis.velocity *= Math.exp(-DAMPING * dt)
+      axis.value += axis.velocity * dt
+      return Math.abs(target - axis.value) < TOL_POS && Math.abs(axis.velocity) < TOL_VEL
+    }
+
+    function loop(state, t) {
+      if (!state.pill.isConnected) {
+        state.frame = 0
+        return
+      }
+      var elapsed = state.lastTime ? t - state.lastTime : 1000 / 60
+      var dt = Math.min(Math.max(elapsed / 1000, MIN_FRAME), 1 / 30)
+      state.lastTime = t
+      var dx = spring(state.centerX, state.targetCenterX, dt)
+      var dy = spring(state.centerY, state.targetCenterY, dt)
+      var dw = spring(state.width, state.targetWidth, dt)
+      var dh = spring(state.height, state.targetHeight, dt)
+      if (dx && dy && dw && dh) {
+        state.centerX.value = state.targetCenterX
+        state.centerY.value = state.targetCenterY
+        state.width.value = state.targetWidth
+        state.height.value = state.targetHeight
+        state.centerX.velocity = 0
+        state.centerY.velocity = 0
+        state.width.velocity = 0
+        state.height.velocity = 0
+        state.lastTime = 0
+        state.frame = 0
+        render(state)
+        return
+      }
+      render(state)
+      state.frame = requestAnimationFrame(function (t2) {
+        loop(state, t2)
+      })
+    }
+
+    function kick(state) {
+      if (!state.frame) {
+        state.lastTime = 0
+        state.frame = requestAnimationFrame(function (t) {
+          loop(state, t)
+        })
+      }
+    }
+
+    function cancel(state) {
+      if (state.frame) cancelAnimationFrame(state.frame)
+      state.frame = 0
+      state.lastTime = 0
+    }
+
+    // 更新目标；reduceMotion 时瞬移不动画
+    function aim(state, item, instant) {
+      measure(state, item)
+      if (instant) {
+        cancel(state)
+        state.centerX.value = state.targetCenterX
+        state.centerY.value = state.targetCenterY
+        state.width.value = state.targetWidth
+        state.height.value = state.targetHeight
+        state.centerX.velocity = 0
+        state.centerY.velocity = 0
+        state.width.velocity = 0
+        state.height.velocity = 0
+        render(state)
+        return
+      }
+      kick(state)
+    }
+
+    function show(state, item) {
+      var wasHidden = !state.visible
+      state.aimed = item
+      state.visible = true
+      state.pill.classList.add('is-active')
+      aim(state, item, wasHidden || reduceMotion())
+    }
+
+    function hide(state) {
+      if (!state.visible) return
+      state.visible = false
+      state.aimed = null
+      state.pill.classList.remove('is-active')
+      render(state)
+      kick(state)
+    }
+
+    // 为单个 track 绑定指针/焦点事件（事件委托，切页后依然有效）
+    function bindTrack(state, signal) {
+      var container = state.container
+      var resolve = function (target) {
+        if (!(target instanceof Element)) return null
+        var item = target.closest(ITEM)
+        if (!item || item.closest(TRACK) !== container) return null
+        return item
+      }
+      container.addEventListener(
+        'pointerover',
+        function (e) {
+          var item = resolve(e.target)
+          if (item) show(state, item)
+        },
+        { signal: signal },
+      )
+      container.addEventListener(
+        'pointerleave',
+        function () {
+          hide(state)
+        },
+        { signal: signal },
+      )
+      container.addEventListener(
+        'focusin',
+        function (e) {
+          var item = resolve(e.target)
+          if (item) show(state, item)
+        },
+        { signal: signal },
+      )
+      container.addEventListener(
+        'focusout',
+        function (e) {
+          var related = e.relatedTarget
+          if (related instanceof Node && container.contains(related)) return
+          hide(state)
+        },
+        { signal: signal },
+      )
+      var reposition = function () {
+        if (!state.visible || !state.aimed) return
+        aim(state, state.aimed, reduceMotion())
+      }
+      window.addEventListener('resize', reposition, { passive: true, signal: signal })
+      document.addEventListener('scroll', reposition, { passive: true, signal: signal })
+    }
+
+    function bootGlide() {
+      // 仅在有精确指针的桌面设备启用；触屏无 hover，启用反而干扰
+      if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
+      if (reduceMotion()) return
+      ac.abort()
+      ac = new AbortController()
+      document.querySelectorAll(TRACK).forEach(function (track) {
+        var state = makeState(track)
+        if (state) bindTrack(state, ac.signal)
+      })
+      // Swup 切页后重扫（Navbar 在 main 之外不会重建，这里仅为健壮性兑底；
+      // abort 后重新赋 ac，保证旧监听器真正被撤销）
+      var rescan = function () {
+        ac.abort()
+        ac = new AbortController()
+        document.querySelectorAll(TRACK).forEach(function (track) {
+          var s = makeState(track)
+          if (s) bindTrack(s, ac.signal)
+        })
+      }
+      document.addEventListener('swup:page:view', rescan)
+      document.addEventListener('astro:page-load', rescan)
+    }
+
+    // 监听器统一管理句柄：rescan 时 abort 后重建，保证旧监听器真正撤销
+    var ac = new AbortController()
+
+    // 惰性启动：等空闲再跑，不影响首屏
+    var idle =
+      window.requestIdleCallback ||
+      function (cb) {
+        return setTimeout(cb, 1)
+      }
+    idle(bootGlide)
+
+    // ---------- 汉堡抽屉 ----------
+    var burger = document.getElementById('menu-btn')
+    var drawer = document.getElementById('navbar-drawer')
+    if (burger && drawer) {
+      function setDrawer(open) {
+        drawer.classList.toggle('is-open', open)
+        drawer.setAttribute('aria-hidden', open ? 'false' : 'true')
+        burger.setAttribute('aria-expanded', open ? 'true' : 'false')
+        burger.setAttribute('aria-label', open ? '关闭菜单' : '打开菜单')
+        header.classList.toggle('is-drawer-open', open)
+      }
+
+      burger.addEventListener('click', function (event) {
+        event.stopPropagation()
+        setDrawer(!drawer.classList.contains('is-open'))
+      })
+
+      // 点面板外部关闭
+      document.addEventListener('click', function (event) {
+        if (!drawer.classList.contains('is-open')) return
+        if (drawer.contains(event.target) || burger.contains(event.target)) return
+        setDrawer(false)
+      })
+
+      // Esc 关闭
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') setDrawer(false)
+      })
+
+      // 点击抽屉内链接后关闭
+      drawer.addEventListener('click', function (event) {
+        if (event.target.closest('a')) setDrawer(false)
+      })
+
+      // Swup 切页后关闭抽屉
+      document.addEventListener('swup:page:view', function () {
+        setDrawer(false)
+      })
+    }
+  })()
+</script>

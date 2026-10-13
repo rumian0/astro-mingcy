@@ -1,0 +1,113 @@
+---
+// SiteVisitors.astro — 全站累计曝光次数（Umami 分享 API，纯 fetch，无需登录）
+// 数据流：GET /api/share/{shareId} 公开元数据 → 拿 websiteId + JWT token
+//         带 x-umami-share-token / x-umami-share-context 头 → daterange 取全站首日
+//         → stats?startAt=首日&endAt=now 得 pageviews（全站累计页面曝光次数）
+// CORS 已全开放（ACAO:* + ACAH:*），浏览器可直接跨域请求，无需服务端代理
+// 每天仅首次真实请求一次，结果 sessionStorage 缓存当天；失败回退历史缓存，再失败显示 "--"
+---
+
+<span class="site-visitors" title="基于 Umami 统计的全站累计曝光次数" aria-label="全站累计曝光次数">
+  本站已被曝光 <span class="site-visitors-value tabular-nums">--</span> 次
+</span>
+
+<script is:inline>
+  // Umami 分享 API 访客数展示 —— 幂等守卫，仅首个实例注册逻辑
+  ;(function () {
+    if (window.__siteVisitorsInit) return
+    window.__siteVisitorsInit = true
+
+    const API = 'https://your-umami.example.com'
+    const SHARE_ID = 'YOUR_SHARE_ID'
+    const PLACEHOLDER = '--'
+    const CACHE_KEY = 'mcy:total-visitors'
+    const DONE = 'done'
+
+    function todayStr() {
+      const d = new Date()
+      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate()
+    }
+
+    // 读取 / 写入每日缓存；损坏则视为无
+    function readCache() {
+      try {
+        const raw = sessionStorage.getItem(CACHE_KEY)
+        return raw ? JSON.parse(raw) : null
+      } catch (e) {
+        return null
+      }
+    }
+    function writeCache(day, v) {
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ day, v }))
+      } catch (e) {}
+    }
+
+    function format(n) {
+      return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    }
+
+    function render(v) {
+      const nodes = document.querySelectorAll('.site-visitors')
+      nodes.forEach(function (el) {
+        const value = el.querySelector('.site-visitors-value')
+        if (value) value.textContent = v
+        el.setAttribute('data-state', DONE)
+      })
+    }
+
+    async function getJson(url, headers) {
+      const res = await fetch(url, { headers })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      return res.json()
+    }
+
+    // 全流程：share 元数据 → daterange → stats(visitors)；结果写当天缓存
+    async function load() {
+      const cached = readCache()
+      const day = todayStr()
+      if (cached && cached.day === day && cached.v != null) {
+        render(cached.v)
+        return
+      }
+
+      try {
+        const meta = await getJson(API + '/api/share/' + SHARE_ID)
+        const h = {
+          'x-umami-share-token': meta.token,
+          'x-umami-share-context': '1',
+        }
+        const wd = meta.websiteId
+        const dr = await getJson(API + '/api/websites/' + wd + '/daterange', h)
+        const stats = await getJson(
+          API +
+            '/api/websites/' +
+            wd +
+            '/stats?startAt=' +
+            Date.parse(dr.startDate) +
+            '&endAt=' +
+            Date.now(),
+          h,
+        )
+        const n = Number(stats && stats.pageviews)
+        if (isNaN(n) || n < 0) {
+          render(cached && cached.v != null ? cached.v : PLACEHOLDER)
+          return
+        }
+        const v = format(n)
+        writeCache(day, v)
+        render(v)
+      } catch (e) {
+        // 瞬时网络错误：回退历史缓存，避免当天整天显示 "--"
+        render(cached && cached.v != null ? cached.v : PLACEHOLDER)
+      }
+    }
+
+    // 延迟到页面解析完成后执行，不抢占首帧/阻塞 LCP
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', load)
+    } else {
+      requestAnimationFrame(load)
+    }
+  })()
+</script>

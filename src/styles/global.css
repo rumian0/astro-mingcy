@@ -1,0 +1,673 @@
+@import './iconfont.css';
+@import './shiki.css';
+@import './markdown.css';
+@import './signature.css';
+@import './swup.css';
+
+@font-face {
+  font-family: 'Atkinson';
+  src: url('/fonts/atkinson-regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Atkinson';
+  src: url('/fonts/atkinson-bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+::selection {
+  background-color: theme('colors.accent');
+  color: white;
+}
+
+[data-theme='dark'] ::selection {
+  background-color: theme('colors.accent/0.3');
+}
+
+html {
+  color: theme('textColor.primary');
+  background-color: theme('backgroundColor.root');
+  scroll-padding-top: 64px;
+  overflow-x: hidden;
+}
+
+html.gray {
+  filter: grayscale(1);
+}
+
+* {
+  scrollbar-width: thin;
+}
+
+/* ─── Border Glow Card ─── */
+
+.border-glow-card {
+  --edge-proximity: 0;
+  --cursor-angle: 45deg;
+  --edge-sensitivity: 30;
+  --border-radius: 12px;
+  --glow-padding: 30px;
+  --cone-spread: 25;
+  position: relative;
+  border-radius: var(--border-radius);
+  isolation: isolate;
+  transform: translate3d(0, 0, 0.01px);
+  overflow: visible;
+}
+
+.border-glow-card::before,
+.border-glow-card::after,
+.border-glow-card > .edge-light {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transition: opacity 0.25s ease-out;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.border-glow-card:not(:hover)::before,
+.border-glow-card:not(:hover)::after,
+.border-glow-card:not(:hover) > .edge-light {
+  opacity: 0;
+  transition: opacity 0.75s ease-in-out;
+}
+
+.border-glow-card::before {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(rgb(var(--color-bg-primary)) 0 100%) padding-box,
+    radial-gradient(
+        at 50% 50%,
+        rgb(from var(--color-accent, 245 85 85) r g b / 0.45) 0px,
+        transparent 50%
+      )
+      border-box;
+  opacity: calc((var(--edge-proximity) - 50) / 50);
+  mask-image: conic-gradient(
+    from var(--cursor-angle) at center,
+    black calc(var(--cone-spread) * 1%),
+    transparent calc((var(--cone-spread) + 15) * 1%),
+    transparent calc((100 - var(--cone-spread) - 15) * 1%),
+    black calc((100 - var(--cone-spread)) * 1%)
+  );
+}
+
+.border-glow-card::after {
+  background: radial-gradient(
+    at 50% 50%,
+    rgb(from var(--color-accent, 245 85 85) r g b / 0.06) 0px,
+    transparent 50%
+  );
+  mask-image: conic-gradient(
+    from var(--cursor-angle) at center,
+    transparent 5%,
+    black 15%,
+    black 85%,
+    transparent 95%
+  );
+  opacity: calc(var(--edge-proximity) / 100 * 0.5);
+  mix-blend-mode: soft-light;
+}
+
+.border-glow-card > .edge-light {
+  inset: calc(var(--glow-padding) * -1);
+  z-index: -2;
+  mask-image: conic-gradient(
+    from var(--cursor-angle) at center,
+    black 2.5%,
+    transparent 10%,
+    transparent 90%,
+    black 97.5%
+  );
+  opacity: calc((var(--edge-proximity) - 30) / 70);
+  mix-blend-mode: plus-lighter;
+}
+
+.border-glow-card > .edge-light::before {
+  content: '';
+  position: absolute;
+  inset: var(--glow-padding);
+  border-radius: inherit;
+  box-shadow:
+    0 0 1px 0 rgb(from var(--color-accent, 245 85 85) r g b / 0.5),
+    0 0 3px 0 rgb(from var(--color-accent, 245 85 85) r g b / 0.35),
+    0 0 6px 0 rgb(from var(--color-accent, 245 85 85) r g b / 0.25),
+    0 0 15px 0 rgb(from var(--color-accent, 245 85 85) r g b / 0.15),
+    0 0 25px 2px rgb(from var(--color-accent, 245 85 85) r g b / 0.1),
+    0 0 50px 2px rgb(from var(--color-accent, 245 85 85) r g b / 0.05);
+}
+
+.border-glow-inner {
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+/* ─── Cloud Badge ─── */
+
+.cloud-badge {
+  position: relative;
+  background: transparent;
+  border: 1px solid rgb(from var(--color-accent, 245 85 85) r g b / 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow:
+    0 0 10px rgb(from var(--color-accent, 245 85 85) r g b / 0.05),
+    inset 0 0 6px rgb(from var(--color-accent, 245 85 85) r g b / 0.04);
+  isolation: isolate;
+  transition: all 0.3s ease;
+}
+
+.cloud-badge::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      ellipse at 20% 50%,
+      rgb(from var(--color-accent, 245 85 85) r g b / 0.1) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at 80% 50%,
+      rgb(from var(--color-accent, 245 85 85) r g b / 0.06) 0%,
+      transparent 60%
+    );
+  z-index: -1;
+  filter: blur(4px);
+  transition: all 0.3s ease;
+}
+
+.cloud-badge:hover {
+  border-color: rgb(from var(--color-accent, 245 85 85) r g b / 0.25);
+  box-shadow:
+    0 0 16px rgb(from var(--color-accent, 245 85 85) r g b / 0.1),
+    inset 0 0 8px rgb(from var(--color-accent, 245 85 85) r g b / 0.06);
+}
+
+.cloud-badge:hover::before {
+  background:
+    radial-gradient(
+      ellipse at 20% 50%,
+      rgb(from var(--color-accent, 245 85 85) r g b / 0.15) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse at 80% 50%,
+      rgb(from var(--color-accent, 245 85 85) r g b / 0.1) 0%,
+      transparent 60%
+    );
+}
+
+/* ─── Glob Border Effect ─── */
+
+.glow-border {
+  box-shadow:
+    0 0 12px rgb(from var(--color-accent, 245 85 85) r g b / 0.15),
+    0 0 2px rgb(from var(--color-accent, 245 85 85) r g b / 0.3) inset;
+}
+
+/* ─── Grain Texture ─── */
+
+.site-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.4' numOctaves='4' stitchTiles='stitch' result='noise'/%3E%3CfeColorMatrix type='matrix' values='0.5 0 0 0 0 0 0.5 0 0 0 0 0 0.5 0 0 0 0 0 1 0' in='noise'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 240px 240px;
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  contain: paint;
+}
+
+@media (pointer: coarse) {
+  .hidden-mobile {
+    display: none !important;
+  }
+}
+
+/* ─── Spoiler ─── */
+.spoiler {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 0.125rem;
+  padding: 0 0.125rem;
+  transition: all 0.3s;
+  background: currentColor;
+  color: transparent;
+}
+
+.spoiler:hover {
+  background: rgb(from theme('colors.accent') r g b / 0.15);
+  color: inherit;
+}
+
+html[data-theme='dark'] .spoiler:hover {
+  background: rgb(from theme('colors.accent') r g b / 0.2);
+  color: inherit;
+}
+
+/* ─── Card Glass CSS Variables ─── */
+:root {
+  /* 随机壁纸 URL（一次请求、多处复用）：Layout 内联脚本 + Service Worker 协作。
+     SW 用 no-cors fetch 拿 opaque response 存进固定 KEY 缓存（忽略 ?v=timestamp），
+     刷新时 SW 命中缓存秒开、后台静默更新下一张；脚本 apply() 把带时间戳的真实 URL
+     写入本变量，全局背景层 / 侧边栏卡片 / 关于页装饰图全部读同一变量，浏览器只下载一次。
+     兑底值 none：未加载时 ::before 无背景图 + opacity:0 → 露元素的纯色 background-color
+     （即「没加随机图之前的黑白纯色背景」），脚本未跑/图未加载完绝不额外下载兜底图 */
+  --random-bg-url: none;
+
+  --card-glass-bg: rgb(from var(--color-bg-primary) r g b / 0.45);
+  --card-glass-border: rgba(0, 0, 0, 0.05);
+  --card-glass-shadow: 0 0 0 1px rgba(0, 0, 0, 0.02), 0 4px 20px rgba(0, 0, 0, 0.05);
+  --card-glass-hover-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(0, 0, 0, 0.1),
+    0 0 20px rgb(from var(--color-accent, 245 85 85) r g b / 0.06);
+  --card-glass-hover-translate: -6px;
+  --card-glass-radius: 18px;
+  /* 首页文章卡片：深蓝边框（参考 astro-devosfera） */
+  --post-card-border: rgba(48, 92, 220, 0.45);
+}
+
+html[data-theme='dark'] {
+  --card-glass-bg: rgb(from var(--color-bg-primary) r g b / 0.18);
+  --card-glass-border: rgba(255, 255, 255, 0.06);
+  --card-glass-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 8px 32px rgba(0, 0, 0, 0.5);
+  --card-glass-hover-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06), 0 16px 48px rgba(0, 0, 0, 0.7),
+    0 0 20px rgb(from var(--color-accent, 245 85 85) r g b / 0.12),
+    0 0 40px rgb(from var(--color-accent, 245 85 85) r g b / 0.05);
+  --post-card-border: rgba(78, 134, 255, 0.45);
+}
+
+/* ─── 全局壁纸背景（随机图源 随机壁纸 + 高斯模糊 + 明暗遮罩） ─── */
+/* 全局壁纸：随机图源 随机图（每次整页加载换一张，由 Layout 内联脚本注入带时间戳的 URL）
+   blur 12px 保留壁纸轮廓又不喧宾夺主；contain:strict 把重绘范围压到最小
+
+   【壁纸尺寸】尺寸/铺满/居中/no-repeat 策略已下沉到下方的图片层规则（.site-wallpaper::before）
+
+   【视差】不写 background-attachment:fixed —— 本元素本身 position:fixed 已等效实现
+   视口固定；background-attachment:fixed 在 iOS Safari 有重绘卡顿与被忽略的问题
+
+   【加载过渡】图片不在元素本身上，而在 ::before（::after 已被可读性遮罩占用）。
+   解码完成前 opacity:0 → 露出元素的占位底色；Layout 脚本写入 --random-bg-url 后给
+   html 加 .bg-ready → 图片层 0.9s 淡入。侧边栏卡片复用同一条规则（走 ::after）+ 同一
+   变量 + 同一 transition，html.bg-ready 是同一个 class 切换，两处必然同步，不会出现
+   一处已显示、一处还在加载的割裂状态 */
+.site-wallpaper {
+  position: fixed;
+  inset: -48px; /* 向外扩一圈：模糊后边缘不留白边 */
+  z-index: 0;
+  pointer-events: none;
+  /* 占位底色：图片解码完成前显示此色，与全局主题一致，不会出现白块 */
+  background-color: rgb(var(--color-bg-primary, 242 245 236));
+  filter: blur(12px) saturate(1.1);
+  contain: strict;
+}
+
+/* 图片层：全局背景走 ::before（::after 是可读性遮罩），侧边栏卡片走 ::after。
+   合并成一条规则 → 同一 --random-bg-url、同一 opacity transition，保证两处同步淡入 */
+.site-wallpaper::before,
+.bg-shared-media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--random-bg-url);
+  background-size: cover; /* 自适应铺满：按宽高比缩放，不额外放大 */
+  background-position: center center; /* 任意宽高比居中裁切，主体不偏移 */
+  background-repeat: no-repeat; /* 禁止平铺，杜绝窄屏/极端比例下的重复纹理 */
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+html.bg-ready .site-wallpaper::before,
+html.bg-ready .bg-shared-media::after {
+  opacity: 1;
+}
+
+/* 侧边栏卡片随机图媒体框：与全局背景共用 --random-bg-url，不再单独发请求 */
+.bg-shared-media {
+  position: relative;
+  overflow: hidden;
+  /* 占位底色：与全局背景同族（二级背景色），加载期视觉一致 */
+  background-color: rgb(var(--color-bg-secondary, 233 237 219));
+}
+
+/* 小屏 GPU 预算有限：模糊再减 */
+@media (max-width: 768px) {
+  .site-wallpaper {
+    filter: blur(6px) saturate(1.05);
+  }
+}
+
+/* 可读性遮罩：大幅减弱（原来 50%/65% + main 的 50–75% 叠加后壁纸只剩 12–15% 可见，
+   等于没背景）。现首页壁纸可见约 50%，文章页约 32% */
+.site-wallpaper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(var(--color-bg-primary, 242 245 236) / 0.2);
+}
+
+html[data-theme='dark'] .site-wallpaper::after {
+  background: rgb(var(--color-bg-primary, 16 19 26) / 0.36);
+}
+
+/* Home page background */
+.page-bg-home {
+  background: rgb(var(--color-bg-primary, 242 245 236) / 0.15);
+}
+
+/* ─── Glass Card (Dark 3D Liquid Glass inspired) ─── */
+.card-glass {
+  position: relative;
+  isolation: isolate;
+  background: var(--card-glass-bg);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border: 1px solid var(--card-glass-border);
+  border-radius: var(--card-glass-radius);
+  box-shadow: var(--card-glass-shadow);
+  overflow: hidden;
+  will-change: transform;
+  transition:
+    transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    box-shadow 0.4s ease;
+}
+
+.card-glass:hover {
+  transform: translateY(var(--card-glass-hover-translate));
+  box-shadow: var(--card-glass-hover-shadow);
+}
+
+/* ─── 首页文章卡片：深蓝边框 + 鼠标跟随高光（参考 astro-devosfera Card.astro） ───
+   仅作用于 .post-list 内的文章卡片，不改变侧栏/摘要卡的玻璃样式 */
+.post-list .card-glass {
+  background: rgb(var(--color-bg-primary) / 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--post-card-border);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(10, 20, 60, 0.04),
+    0 10px 28px -12px rgb(var(--color-accent) / 0.1);
+  transition:
+    transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    background-color 0.3s ease;
+}
+
+.post-list .card-glass:hover {
+  transform: translateY(-4px);
+  border-color: rgba(86, 144, 255, 0.78);
+  box-shadow:
+    0 14px 34px -10px rgba(10, 20, 60, 0.2),
+    0 0 0 1px rgba(86, 144, 255, 0.12),
+    0 0 26px -2px rgb(var(--color-accent) / 0.22);
+}
+
+/* 鼠标跟随径向高光层（--mouse-x/--mouse-y 由 PostList 脚本注入） */
+.post-list .card-glass .card-glow-effect {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: radial-gradient(
+    460px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgb(var(--color-accent) / 0.16) 0%,
+    rgb(var(--color-accent) / 0.07) 35%,
+    transparent 72%
+  );
+}
+
+.post-list .card-glass:hover .card-glow-effect {
+  opacity: 1;
+}
+
+.post-list .card-glass > a {
+  position: relative;
+  z-index: 1;
+}
+
+/* 点击卡片时的弹簧"弹出"（配合 Swup 页面切换） */
+.post-list .card-glass.card-press {
+  transform: scale(1.03);
+  border-color: rgb(var(--color-accent) / 0.6);
+  box-shadow:
+    0 0 0 1px rgb(var(--color-accent) / 0.35),
+    0 0 46px rgb(var(--color-accent) / 0.3);
+  transition:
+    transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+/* ─── Scroll performance: 滚动时临时降级毛玻璃 ───
+   backdrop-filter 在滚动时需要为每帧重算背景模糊，是滚动卡顿/掉帧的主因。
+   滚动期间统一移除（玻璃退化为半透明纯色），滚动停止 120ms 后自动恢复。 */
+body.is-scrolling .card-glass,
+body.is-scrolling .sidebar-card,
+body.is-scrolling .cloud-badge,
+body.is-scrolling .comment-block {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ─── Card content typography ─── */
+.card-content .category-badge {
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  padding: 0.25rem 0.625rem;
+}
+
+.card-content .post-title {
+  font-size: 1.125rem;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.card-content .post-summary {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  opacity: 0.7;
+}
+
+.card-content .post-meta {
+  font-size: 0.75rem;
+  opacity: 0.55;
+}
+
+/* ─── Home Three-Column Layout ─── */
+.home-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.right-sidebar {
+  display: none;
+}
+
+.sidebar-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* sidebar cards: reuse card-glass tokens, but static (no hover lift) */
+.sidebar-card {
+  position: relative;
+  isolation: isolate;
+  background: var(--card-glass-bg);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border: 1px solid var(--card-glass-border);
+  border-radius: var(--card-glass-radius);
+  box-shadow: var(--card-glass-shadow);
+  overflow: hidden;
+}
+
+.sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary, inherit);
+}
+
+.sidebar-title::before {
+  content: '';
+  width: 0.25rem;
+  height: 1rem;
+  border-radius: 4px;
+  background: var(--color-accent, 245 85 85);
+}
+
+@media (min-width: 641px) {
+  .right-sidebar {
+    display: block;
+  }
+  .home-grid {
+    grid-template-columns: 1fr 260px;
+  }
+}
+
+@media (min-width: 769px) {
+  /* 左栏合并入右栏后：文章列表独占左侧拉长，右侧单列侧边栏 */
+  .home-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 1rem;
+  }
+}
+
+/* right sidebar cards below 769px */
+@media (min-width: 641px) and (max-width: 768px) {
+  .sidebar-col {
+    gap: 1rem;
+  }
+}
+
+/* Profile icons row */
+.profile-nav {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.375rem;
+  margin-top: 1rem;
+}
+
+.profile-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border-primary);
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.profile-nav a:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: rgb(from var(--color-accent) r g b / 0.08);
+}
+
+/* Site info tech stack grid */
+.tech-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.375rem;
+}
+
+.tech-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.5rem;
+  background: rgb(from var(--color-accent) r g b / 0.06);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.tech-item b {
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  font-size: 0.75rem;
+  border-bottom: 1px dashed var(--color-border-primary);
+}
+
+.info-row:last-of-type {
+  border-bottom: none;
+}
+
+.info-row .v {
+  color: var(--color-text-primary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Clock digits */
+.clock-time {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* Mobile (≤768px) ─── */
+@media (max-width: 768px) {
+  .post-list {
+    perspective: none !important;
+  }
+
+  .card-glass,
+  .card-glass:nth-child(odd),
+  .card-glass:nth-child(even) {
+    transform: none !important;
+  }
+
+  .card-cover-mobile-hidden {
+    display: none;
+  }
+
+  .card-content {
+    padding: 1rem;
+    gap: 0.375rem;
+  }
+
+  .card-content .post-title {
+    font-size: 1rem;
+  }
+
+  .card-content .post-summary {
+    font-size: 0.75rem;
+    opacity: 0.65;
+  }
+}

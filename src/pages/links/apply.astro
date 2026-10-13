@@ -1,0 +1,210 @@
+---
+import PageLayout from '@/layouts/PageLayout.astro'
+import { Comments } from '@/components/comment'
+---
+
+<PageLayout>
+  <div class="max-w-3xl px-4 py-20 mx-auto">
+    <h1 class="mb-2 text-center text-3xl font-bold">友链申请</h1>
+    <p class="mb-8 text-center text-secondary">想和站长交换友链？请先阅读下面的申请说明</p>
+
+    <div class="mb-4 flex gap-2 justify-center">
+      <a
+        href="/links/"
+        class="rounded-lg border border-accent/30 bg-accent/10 px-4 py-2 text-sm text-accent transition-colors hover:bg-accent/20"
+        >查看友链</a
+      >
+    </div>
+
+    <!-- 流程步骤 -->
+    <div class="grid gap-4 mb-6 md:grid-cols-3">
+      <div
+        class="rounded-2xl border border-primary/20 bg-secondary/30 p-6 text-center backdrop-blur-sm"
+      >
+        <div
+          class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-accent/20 text-lg font-bold text-accent"
+        >
+          01
+        </div>
+        <h3 class="mb-2 font-bold">确认要求</h3>
+        <p class="text-sm text-secondary">确认贵站符合基本要求，并先添加本站友链</p>
+      </div>
+      <div
+        class="rounded-2xl border border-primary/20 bg-secondary/30 p-6 text-center backdrop-blur-sm"
+      >
+        <div
+          class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-accent/20 text-lg font-bold text-accent"
+        >
+          02
+        </div>
+        <h3 class="mb-2 font-bold">整理信息</h3>
+        <p class="text-sm text-secondary">按照格式整理站点信息，尽量提供稳定可访问的头像链接</p>
+      </div>
+      <div
+        class="rounded-2xl border border-primary/20 bg-secondary/30 p-6 text-center backdrop-blur-sm"
+      >
+        <div
+          class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-accent/20 text-lg font-bold text-accent"
+        >
+          03
+        </div>
+        <h3 class="mb-2 font-bold">提交申请</h3>
+        <p class="text-sm text-secondary">在页面底部评论区提交申请，审核通过后会添加并回复</p>
+      </div>
+    </div>
+
+    <!-- 要求列表 -->
+    <div class="mb-6 rounded-2xl border border-primary/20 bg-secondary/30 p-6 backdrop-blur-sm">
+      <h2 class="mb-4 text-lg font-bold">友链要求</h2>
+      <ul class="space-y-3 text-sm">
+        <li class="flex gap-3">
+          <span class="mt-0.5 flex-shrink-0">📌</span><span
+            ><strong>站点定位</strong> — 优先接受个人博客、技术笔记、生活记录等非强商业化站点</span
+          >
+        </li>
+        <li class="flex gap-3">
+          <span class="mt-0.5 flex-shrink-0">📌</span><span
+            ><strong>内容质量</strong> — 希望有稳定且真实的内容输出，避免整站搬运和 AI 批量灌水</span
+          >
+        </li>
+        <li class="flex gap-3">
+          <span class="mt-0.5 flex-shrink-0">📌</span><span
+            ><strong>合规底线</strong> — 站点不得包含违法违规、色情、赌博、侵权盗版等内容</span
+          >
+        </li>
+        <li class="flex gap-3">
+          <span class="mt-0.5 flex-shrink-0">📌</span><span
+            ><strong>访问体验</strong> — 站点应能稳定访问，尽量保证国内访问体验</span
+          >
+        </li>
+        <li class="flex gap-3">
+          <span class="mt-0.5 flex-shrink-0">📌</span><span
+            ><strong>互惠原则</strong> — 申请前请先添加本站友链，或在留言中说明预计添加时间</span
+          >
+        </li>
+        <li class="flex gap-3">
+          <span class="mt-0.5 flex-shrink-0">📌</span><span
+            ><strong>内容数量</strong> — 建议已有 <strong>15 篇以上</strong
+            >文章，质量较高可放宽</span
+          >
+        </li>
+      </ul>
+    </div>
+
+    <!-- 本站信息 -->
+    <div class="mb-6 rounded-2xl border border-primary/20 bg-secondary/30 p-6 backdrop-blur-sm">
+      <h2 class="mb-3 text-lg font-bold">本站信息</h2>
+      <p class="mb-2 text-sm text-secondary">如果您愿意在贵站添加站长，可以直接使用下面的信息：</p>
+      <pre
+        class="overflow-x-auto rounded-lg bg-black/10 p-4 text-sm text-secondary dark:bg-white/10">
+name: Your Name
+link: https://your-site.example.com
+avatar: https://your-site.example.com/image/avatar.svg
+descr: 简短描述你的站点</pre>
+      siteshot: https://your-site.example.com/og.png rss: https://your-site.example.com/rss.xml
+    </div>
+
+    <!-- 申请格式 -->
+    <div class="mb-6 rounded-2xl border border-primary/20 bg-secondary/30 p-6 backdrop-blur-sm">
+      <h2 class="mb-3 text-lg font-bold">申请格式</h2>
+      <p class="mb-2 text-sm text-secondary">请在评论区按如下格式提交信息：</p>
+      <pre
+        class="overflow-x-auto rounded-lg bg-black/10 p-4 text-sm text-secondary dark:bg-white/10">
+{`{
+  name: ' 名称 ',
+  url: ' 地址 ',
+  avatar: ' 头像 ',
+  desc:  '描述 ',
+}`}</pre>
+      <div class="mt-4 flex justify-end">
+        <button
+          id="import-template-btn"
+          class="cursor-pointer rounded-lg border border-accent/30 bg-accent/10 px-4 py-2 text-sm text-accent transition-colors hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled
+        >
+          📥 一键导入模板
+        </button>
+      </div>
+    </div>
+
+    <script is:inline>
+      ;(function () {
+        var btn = document.getElementById('import-template-btn')
+        if (!btn) return
+
+        var template =
+          'Hi~我已加贵站了，现在申请一下友链！\n' +
+          '{\n' +
+          "  name: ' 名称 ',\n" +
+          "  url: ' 地址 ',\n" +
+          "  avatar: ' 头像 ',\n" +
+          "  desc:  '描述 ',\n" +
+          '}'
+
+        // 取当前激活评论引擎的输入框（双引擎都在 DOM 里，只有 .is-active 的那个可见）
+        // Twikoo → 注入的 ElementUI textarea；Waline → 模板自带的 #wl-edit textarea
+        function getTextarea() {
+          var active = document.querySelector('#comment-block .comment-driver.is-active')
+          if (!active) return null
+          // Twikoo 的 #twikoo 节点会被 Vue 2 的 $mount 替换掉，用 data-engine 壳判定更可靠
+          if (active.getAttribute('data-engine') === 'waline') {
+            return active.querySelector('#wl-edit')
+          }
+          return active.querySelector('.el-textarea textarea')
+        }
+
+        function tryEnableButton() {
+          if (getTextarea()) {
+            btn.disabled = false
+            return true
+          }
+          return false
+        }
+
+        // MutationObserver 监听整个评论区块：输入框由用户当前选择的引擎异步注入
+        // （懒加载下可能先渲染的是 Twikoo、切到 Waline 后才出现，故不只监听 #twikoo）
+        var observer = new MutationObserver(function () {
+          if (tryEnableButton()) {
+            observer.disconnect()
+          }
+        })
+
+        var commentEl =
+          document.getElementById('comment-block') || document.getElementById('twikoo')
+        if (commentEl) {
+          observer.observe(commentEl, { childList: true, subtree: true })
+        }
+
+        // 如果已经加载完成，直接启用
+        tryEnableButton()
+
+        // 兜底：轮询 5 秒（防止 MutationObserver 错过）
+        var fallbackTimer = 0
+        var fallback = setInterval(function () {
+          if (tryEnableButton() || ++fallbackTimer > 10) {
+            clearInterval(fallback)
+          }
+        }, 500)
+
+        btn.addEventListener('click', function () {
+          var ta = getTextarea()
+          if (!ta) return
+
+          ta.value = template
+          ta.dispatchEvent(new Event('input', { bubbles: true }))
+          ta.dispatchEvent(new Event('change', { bubbles: true }))
+          ta.focus()
+        })
+      })()
+    </script>
+
+    <!-- 评论区 -->
+    <div class="rounded-2xl border border-primary/20 bg-secondary/30 p-6 backdrop-blur-sm">
+      <h2 class="mb-3 text-lg font-bold">提交申请</h2>
+      <p class="mb-4 text-sm text-secondary">
+        提交后我会尽快查看。若信息不完整或暂未满足要求，我会在评论区说明原因。
+      </p>
+      <Comments bare />
+    </div>
+  </div>
+</PageLayout>

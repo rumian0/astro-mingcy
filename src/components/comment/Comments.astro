@@ -1,0 +1,331 @@
+---
+import Twikoo from './Twikoo.astro'
+import Waline from './Waline.astro'
+
+interface Props {
+  /** 区块标题 */
+  title?: string
+  /** 嵌套在其它卡片内时使用（友链申请页），去掉自身的玻璃外壳 */
+  bare?: boolean
+}
+
+const { title = '评论', bare = false } = Astro.props
+---
+
+<section id="comment-block" class:list={['comment-block', { 'comment-block--bare': bare }]}>
+  <header class="comment-head">
+    <h2 class="comment-title">
+      <span class="comment-title-bar" aria-hidden="true"></span>
+      {title}
+    </h2>
+
+    <div class="driver-switch" role="tablist" aria-label="选择评论系统">
+      <span class="driver-switch__track" aria-hidden="true"></span>
+      <button
+        type="button"
+        class="driver-switch__btn is-active"
+        data-driver="twikoo"
+        role="tab"
+        aria-selected="true"
+        aria-controls="twikoo"
+        title="Twikoo 评论"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path
+            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+          ></path>
+        </svg>
+        <span>Twikoo</span>
+      </button>
+      <button
+        type="button"
+        class="driver-switch__btn"
+        data-driver="waline"
+        role="tab"
+        aria-selected="false"
+        aria-controls="waline"
+        title="Waline 评论"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="3" y="4.5" width="18" height="14" rx="4.5"></rect>
+          <path d="M7.5 12.5h9"></path>
+          <path d="M7.5 9.5h5"></path>
+        </svg>
+        <span>Waline</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="comment-body">
+    <Twikoo />
+    <Waline />
+    <div class="driver-loading" hidden>
+      <span class="driver-loading__ring" aria-hidden="true"></span>
+      <span class="driver-loading__text">正在加载评论…</span>
+    </div>
+  </div>
+</section>
+
+<style is:global>
+  /* ─── 评论区块外壳：玻璃卡片，与站内 card-glass 同一语言 ─── */
+  .comment-block {
+    position: relative;
+    border-radius: 1.25rem;
+    border: 1px solid rgb(var(--color-border-primary) / 0.55);
+    background: rgb(var(--color-bg-secondary) / 0.35);
+    backdrop-filter: saturate(160%) blur(12px);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+    padding: 1.35rem 1.35rem 1.5rem;
+    box-shadow:
+      0 1px 0 rgb(var(--color-bg-primary) / 0.7) inset,
+      0 16px 40px -26px rgb(var(--color-text-primary) / 0.4);
+  }
+
+  html[data-theme='dark'] .comment-block {
+    background: rgb(var(--color-bg-secondary) / 0.45);
+    border-color: rgb(var(--color-border-primary) / 0.85);
+    box-shadow:
+      0 1px 0 rgb(var(--color-bg-primary) / 0.7) inset,
+      0 16px 44px -22px rgb(0 0 0 / 0.8);
+  }
+
+  /* 顶部 accent 流光（科技感） */
+  .comment-block::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14%;
+    right: 14%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(var(--color-accent) / 0.55), transparent);
+    pointer-events: none;
+  }
+
+  /* 嵌套在其它卡片内（友链申请页）：去掉外壳，只留内容与切换器 */
+  .comment-block--bare {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .comment-block--bare::before {
+    display: none;
+  }
+
+  /* ─── 区块头部：标题 + 系统切换器 ─── */
+  .comment-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.95rem;
+    border-bottom: 1px solid rgb(var(--color-border-primary) / 0.35);
+  }
+
+  .comment-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: rgb(var(--color-text-primary));
+  }
+
+  .comment-title-bar {
+    width: 3px;
+    height: 1.05em;
+    border-radius: 2px;
+    background: linear-gradient(180deg, rgb(var(--color-accent)), rgb(var(--color-accent) / 0.25));
+    box-shadow: 0 0 10px rgb(var(--color-accent) / 0.55);
+  }
+
+  /* ─── 胶囊分段切换器 ─── */
+  .driver-switch {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    padding: 3px;
+    border-radius: 9999px;
+    border: 1px solid rgb(var(--color-border-primary) / 0.6);
+    background: rgb(var(--color-text-primary) / 0.04);
+    isolation: isolate;
+    flex-shrink: 0;
+  }
+
+  /* 滑动高亮块：accent 淡填色 + 内描边 + 外辉光 */
+  .driver-switch__track {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    bottom: 3px;
+    width: calc(50% - 3px);
+    border-radius: 9999px;
+    background: rgb(var(--color-accent) / 0.14);
+    box-shadow:
+      0 0 0 1px rgb(var(--color-accent) / 0.55) inset,
+      0 1px 0 rgb(255 255 255 / 0.22) inset,
+      0 6px 18px rgb(var(--color-accent) / 0.24);
+    transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 0;
+  }
+
+  html[data-theme='dark'] .driver-switch__track {
+    background: rgb(var(--color-accent) / 0.2);
+  }
+
+  .driver-switch__btn {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.42rem 0.85rem;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    color: rgb(var(--color-text-secondary));
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.3s ease;
+  }
+
+  .driver-switch__btn:hover {
+    color: rgb(var(--color-text-primary));
+  }
+
+  .driver-switch__btn.is-active {
+    color: rgb(var(--color-accent));
+  }
+
+  .driver-switch__btn svg {
+    width: 0.92em;
+    height: 0.92em;
+    flex-shrink: 0;
+  }
+
+  .driver-switch__btn:focus-visible {
+    outline: 2px solid rgb(var(--color-accent));
+    outline-offset: 2px;
+  }
+
+  /* ─── 评论容器：一次只显示一个 ─── */
+  .comment-body {
+    position: relative;
+  }
+
+  .comment-driver {
+    display: none;
+  }
+
+  .comment-driver.is-active {
+    display: block;
+  }
+
+  /* ─── 懒加载指示器 ─── */
+  .driver-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7rem;
+    min-height: 8rem;
+    color: rgb(var(--color-text-secondary));
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+  }
+
+  .driver-loading[hidden] {
+    display: none;
+  }
+
+  .driver-loading__ring {
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 9999px;
+    border: 2px solid rgb(var(--color-accent) / 0.2);
+    border-top-color: rgb(var(--color-accent));
+    animation: driver-spin 0.8s linear infinite;
+  }
+
+  /* 加载失败：停止旋转，给出可读提示（脚本被浏览器拦截等） */
+  .driver-loading[data-error='1'] .driver-loading__ring {
+    animation: none;
+    border-color: rgb(var(--color-text-secondary) / 0.25);
+    border-top-color: rgb(var(--color-text-secondary) / 0.25);
+  }
+
+  .driver-loading[data-error='1'] .driver-loading__text {
+    color: rgb(var(--color-text-primary));
+  }
+
+  @keyframes driver-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* ─── 响应式与动效降级 ─── */
+  @media (max-width: 480px) {
+    .comment-block {
+      padding: 1.1rem 1rem 1.2rem;
+    }
+
+    .comment-head {
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .comment-title {
+      font-size: 0.95rem;
+    }
+
+    .driver-switch__btn {
+      padding: 0.38rem 0.7rem;
+      font-size: 0.72rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .driver-switch__track {
+      transition: none;
+    }
+
+    .driver-loading__ring {
+      animation: none;
+      border-top-color: rgb(var(--color-accent) / 0.4);
+    }
+  }
+</style>

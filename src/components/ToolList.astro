@@ -1,0 +1,44 @@
+---
+import { tools } from '@/data/tools'
+---
+
+{
+  tools.length > 0 ? (
+    <ul class="divide-y divide-primary/15">
+      {tools.map((tool) => (
+        <li class="py-4 first:pt-0 last:pb-0">
+          <a
+            href={tool.url}
+            target="_blank"
+            rel="noopener noreferrer external"
+            class="group flex items-center justify-between gap-4 rounded-lg px-4 py-3 -mx-4 transition-colors hover:bg-accent/5"
+          >
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span class="font-medium group-hover:text-accent transition-colors">
+                  {tool.title}
+                </span>
+                {tool.tags && tool.tags.length > 0 && (
+                  <div class="flex items-center gap-1.5">
+                    {tool.tags.map((tag) => (
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <p class="mt-0.5 text-sm text-secondary line-clamp-1">{tool.description}</p>
+            </div>
+            <i class="iconfont icon-external-link text-sm text-secondary shrink-0 group-hover:text-accent transition-colors" />
+          </a>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <div class="text-center py-16 text-secondary">
+      <i class="iconfont icon-tools text-4xl block mb-4" />
+      <p class="text-lg">工具正在整理中，敬请期待...</p>
+    </div>
+  )
+}

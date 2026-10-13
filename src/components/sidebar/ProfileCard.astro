@@ -1,0 +1,51 @@
+---
+import { author, hero } from '@/config.json'
+import Highlight from '@/components/Highlight.astro'
+
+const navItems = [
+  { name: '首页', href: '/', icon: 'icon-pantone' },
+  { name: '归档', href: '/archives', icon: 'icon-archive' },
+  { name: '项目', href: '/projects', icon: 'icon-rocket' },
+  { name: '关于', href: '/about', icon: 'icon-ghost' },
+]
+---
+
+<div class="sidebar-card p-5 text-center">
+  <div
+    class="mx-auto size-20 overflow-hidden rounded-xl border border-primary bg-zinc-100 dark:bg-zinc-800"
+  >
+    <img class="size-full object-cover" src={author.avatar} alt={author.name} loading="lazy" />
+  </div>
+  <h2 class="mt-3 text-lg font-bold tracking-tight">
+    <Highlight class="font-bold">{author.name}</Highlight>
+  </h2>
+  <p class="mt-1 text-xs text-secondary">{hero.bio}</p>
+
+  <div class="profile-nav">
+    {
+      navItems.map((item) => (
+        <a href={item.href} title={item.name} aria-label={item.name}>
+          <i class={`iconfont ${item.icon}`} />
+        </a>
+      ))
+    }
+  </div>
+
+  <div class="mt-3 flex justify-center gap-2">
+    {
+      hero.socials.map((s) => (
+        <a
+          href={s.url}
+          title={s.name}
+          aria-label={s.name}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex h-8 w-8 items-center justify-center rounded-full text-white transition hover:scale-110"
+          style={{ backgroundColor: s.color }}
+        >
+          <i class={`iconfont ${s.icon}`} />
+        </a>
+      ))
+    }
+  </div>
+</div>

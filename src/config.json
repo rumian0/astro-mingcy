@@ -1,0 +1,133 @@
+{
+  "site": {
+    "url": "https://your-site.example.com",
+    "title": "Astro Mingcy",
+    "description": "一个基于 Astro 的博客主题。",
+    "keywords": "astro,blog,theme,mingcy,博客",
+    "lang": "zh-CN",
+    "favicon": "/favicon.svg",
+    "appleTouchIcon": "/apple-touch-icon.png"
+  },
+  "author": {
+    "name": "Your Name",
+    "twitterId": "",
+    "avatar": "/image/avatar.svg"
+  },
+  "hero": {
+    "name": "Your Name",
+    "bio": "用一句话介绍你自己。",
+    "description": "学生 | 开发者 | 写作者",
+    "socials": [
+      {
+        "name": "Github",
+        "icon": "icon-github",
+        "url": "https://github.com/yourname",
+        "color": "rgb(24, 23, 23)"
+      },
+      {
+        "name": "X",
+        "icon": "icon-x",
+        "url": "https://x.com/yourname",
+        "color": "rgb(36, 46, 54)"
+      },
+      {
+        "name": "Email",
+        "icon": "icon-mail",
+        "url": "mailto:you@example.com",
+        "color": "rgb(212, 70, 56)"
+      }
+    ],
+    "yiyan": "将喜欢的一切藏在身边，这就是努力的意义。"
+  },
+  "color": {
+    "accent": [
+      { "light": "#F55555", "dark": "#325ea3" },
+      { "light": "#0396FF", "dark": "#ABDCFF" },
+      { "light": "#fb7287", "dark": "#99D8CF" },
+      { "light": "#F072B6", "dark": "#3ac8f6" },
+      { "light": "#9F44D3", "dark": "#E2B0FF" },
+      { "light": "#FF6666", "dark": "#A1CCD1" },
+      { "light": "#F6416C", "dark": "#838BC6" },
+      { "light": "#32CCBC", "dark": "#90F7EC" },
+      { "light": "#33A6B8", "dark": "#79F1A4" },
+      { "light": "#F55555", "dark": "#297aa0" }
+    ],
+    "bg": {
+      "primary": { "light": "#f2f5ec", "dark": "#10131a" },
+      "secondary": { "light": "#e9eddb", "dark": "#1a2131" }
+    },
+    "text": {
+      "primary": { "light": "#33373a", "dark": "#f6f7f8" },
+      "secondary": { "light": "#5f6b5a", "dark": "#a9b4c9" }
+    },
+    "border": {
+      "primary": { "light": "#d5dcc6", "dark": "#2e3b59" }
+    }
+  },
+  "menus": [
+    {
+      "name": "首页",
+      "link": "/",
+      "icon": "icon-pantone"
+    },
+    {
+      "name": "归档",
+      "link": "/archives",
+      "icon": "icon-archive"
+    },
+    {
+      "name": "项目",
+      "link": "/projects",
+      "icon": "icon-rocket",
+      "children": [
+        { "name": "项目", "link": "/projects" },
+        { "name": "工具", "link": "/tools" }
+      ]
+    },
+    {
+      "name": "相册",
+      "link": "/galleries",
+      "icon": "icon-flask"
+    },
+    {
+      "name": "关于",
+      "link": "/about",
+      "icon": "icon-ghost"
+    },
+    {
+      "name": "友链",
+      "link": "/links",
+      "icon": "icon-hearts",
+      "children": [
+        { "name": "友链", "link": "/links" },
+        { "name": "友圈", "link": "/links/fcircle" },
+        { "name": "申请友链", "link": "/links/apply" }
+      ]
+    }
+  ],
+  "posts": {
+    "perPage": 5
+  },
+  "footer": {
+    "startTime": "2024-01-21T00:00:00Z"
+  },
+  "twikoo": {
+    "envId": "https://your-twikoo.vercel.app"
+  },
+  "sponsor": {
+    "wechat": "/image/wechat-placeholder.png"
+  },
+  "analytics": {
+    "enable": false,
+    "google": {
+      "measurementId": ""
+    },
+    "umami": {
+      "serverUrl": "https://your-umami.example.com",
+      "websiteId": "your-website-id"
+    },
+    "microsoftClarity": {
+      "projectId": ""
+    }
+  }
+}

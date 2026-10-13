@@ -1,0 +1,50 @@
+---
+import { ThemeSwitch } from './ThemeSwitch'
+import { author, footer } from '@/config.json'
+import { getAllPostsWordCount } from '@/utils/content'
+import { RunningDays } from './RunningDays'
+import SiteVisitors from './SiteVisitors.astro'
+import Link from './Link.astro'
+
+const sinceYear = new Date(footer.startTime).getFullYear()
+const thisYear = new Date().getFullYear()
+const copyDate = sinceYear === thisYear ? thisYear : `${sinceYear} - ${thisYear}`
+
+const wordCount = await getAllPostsWordCount()
+
+const wordCountStr = (wordCount / 1000).toFixed(1) + 'k'
+---
+
+<footer
+  class="relative z-1 py-8 px-4 md:px-8 border-t border-primary text-secondary text-sm bg-primary/70"
+>
+  <div class="text-center space-y-2">
+    <div>
+      Powered by
+      <Link href="https://astro.build/">Astro</Link>
+      & Designed by
+      <Link href="https://github.com/rumian0/astro-mingcy">MingCY</Link>
+    </div>
+    <div class="space-x-1">
+      <span>&copy;{copyDate} <Link href="/">{author.name}</Link>.</span>
+      <Link href="/rss.xml" data-no-swup>
+        <i class="iconfont icon-rss"></i>
+        <span>RSS</span>
+      </Link>
+      <Link href="/sitemap.xml" data-no-swup>
+        <i class="iconfont icon-map"></i>
+        <span>站点地图</span>
+      </Link>
+    </div>
+    <div>
+      <RunningDays client:only="react" />
+      <span class="select-none opacity-50">|</span>
+      <span>共嘚嘚了 {wordCountStr} 字</span>
+      <span class="select-none opacity-50">|</span>
+      <SiteVisitors />
+    </div>
+  </div>
+  <div class="mt-4 flex justify-center">
+    <ThemeSwitch client:only="react" />
+  </div>
+</footer>

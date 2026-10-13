@@ -1,0 +1,106 @@
+---
+import { color as themeColor } from '@/config.json'
+---
+
+<!--
+  随机强调色注入（is:inline + define:vars）
+  ─────────────────────────────────────────────
+  原实现为打包脚本，与 Vercel Analytics 等共享同一模块；
+  该共享模块在模块作用域执行 customElements.define(...)，任一环节出错
+  会导致整个模块失效、注入器被"连坐"，随机色完全消失。
+  现改为 HTML 内联脚本：HTML 解析期同步执行、零模块依赖、不受任何打包影响；
+  纯原生 JS 实现 hex→rgb 与 RGB 插值（替代 chroma-js），行为与原实现一致。
+-->
+<script
+  is:inline
+  define:vars={{
+    accentList: themeColor.accent,
+    bgPrimary: themeColor.bg.primary,
+    bgSecondary: themeColor.bg.secondary,
+    textPrimary: themeColor.text.primary,
+    textSecondary: themeColor.text.secondary,
+    borderPrimary: themeColor.border.primary,
+  }}
+>
+  ;(function () {
+    // 根背景混合基线（与旧 chroma.mix 输入一致）
+    var ROOT_BASE_LIGHT = [242, 245, 236] // rgb(242,245,236) 浅绿底
+    var ROOT_BASE_DARK = [0, 2, 18] // rgb(0,2,18) 深蓝黑底
+
+    function hexToRgb(hex) {
+      var n = parseInt(hex.slice(1), 16)
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+    }
+
+    function mixRgb(a, b, t) {
+      return [
+        Math.round(a[0] + (b[0] - a[0]) * t),
+        Math.round(a[1] + (b[1] - a[1]) * t),
+        Math.round(a[2] + (b[2] - a[2]) * t),
+      ]
+    }
+
+    function rgbStr(c) {
+      return c.join(' ')
+    }
+
+    function inject() {
+      var accent = accentList[(Math.random() * accentList.length) | 0]
+      var al = hexToRgb(accent.light)
+      var ad = hexToRgb(accent.dark)
+      var rootLight = mixRgb(ROOT_BASE_LIGHT, al, 0.05)
+      var rootDark = mixRgb(ROOT_BASE_DARK, ad, 0.12)
+
+      var style = document.createElement('style')
+      style.textContent =
+        'html{' +
+        '--color-accent:' +
+        rgbStr(al) +
+        ';' +
+        '--color-bg-root:' +
+        rgbStr(rootLight) +
+        ';' +
+        '--color-bg-primary:' +
+        rgbStr(hexToRgb(bgPrimary.light)) +
+        ';' +
+        '--color-bg-secondary:' +
+        rgbStr(hexToRgb(bgSecondary.light)) +
+        ';' +
+        '--color-text-primary:' +
+        rgbStr(hexToRgb(textPrimary.light)) +
+        ';' +
+        '--color-text-secondary:' +
+        rgbStr(hexToRgb(textSecondary.light)) +
+        ';' +
+        '--color-border-primary:' +
+        rgbStr(hexToRgb(borderPrimary.light)) +
+        '}' +
+        "[data-theme='dark']{" +
+        '--color-accent:' +
+        rgbStr(ad) +
+        ';' +
+        '--color-bg-root:' +
+        rgbStr(rootDark) +
+        ';' +
+        '--color-bg-primary:' +
+        rgbStr(hexToRgb(bgPrimary.dark)) +
+        ';' +
+        '--color-bg-secondary:' +
+        rgbStr(hexToRgb(bgSecondary.dark)) +
+        ';' +
+        '--color-text-primary:' +
+        rgbStr(hexToRgb(textPrimary.dark)) +
+        ';' +
+        '--color-text-secondary:' +
+        rgbStr(hexToRgb(textSecondary.dark)) +
+        ';' +
+        '--color-border-primary:' +
+        rgbStr(hexToRgb(borderPrimary.dark)) +
+        '}'
+      document.head.appendChild(style)
+    }
+
+    inject()
+    document.addEventListener('swup:content:replace', inject)
+  })()
+</script>

@@ -1,0 +1,180 @@
+---
+// ReadCount.astro — 文章浏览量标签（Umami 分享 API，纯 fetch，零自增副作用）
+// 数据源：GET /api/share/{shareId} 公开元数据 → 拿 websiteId + JWT token
+//         带 x-umami-share-token / x-umami-share-context 头 → metrics?type=path&startAt=0
+//         一次取回全站 800+ 页面路径浏览量，建 {path: N} map 后按 data-path 匹配显示
+// 对比旧 Twikoo COUNTER_GET（读取即自增、多篇共享计数 doc、数据不准）：
+//   Umami 为纯读取真实 PV，无任何写入副作用；全站 pull 一次即可，无逐篇请求
+// 缓存：sessionStorage 按天缓存 map，当天切页/刷新零网络开销；失败显示 "--" 不报错
+// 未匹配到 path 的文章显示 "--"（数据未收录 / 从未被访问）
+
+interface Props {
+  /** 文章路由路径，作为 Umami path 匹配 key（如 /2026/08/16/slug） */
+  postPath: string
+  /** 文章标题（保留接口兼容，Umami 按 path 匹配无需 title） */
+  postTitle?: string
+  /** 附加 class，用于控制间距/对齐 */
+  class?: string
+}
+
+const { postPath, postTitle, class: className } = Astro.props
+---
+
+<span
+  class:list={['read-count', className]}
+  data-path={postPath}
+  title={`${postTitle || ''} · 浏览量`}
+  aria-label={`${postTitle || ''} 浏览量`}
+>
+  <svg
+    class="size-3.5 shrink-0"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+    <circle cx="12" cy="12" r="3"></circle>
+  </svg>
+  <span>阅读量</span>
+  <span class="read-count-value tabular-nums">--</span>
+</span>
+
+<script is:inline>
+  // Umami metrics?type=path 浏览量展示 —— 幂等守卫，仅首个实例注册逻辑
+  // shareType=1 基础分享令牌限制：type=path 可用（v3 由 url 改名），url 过滤参数被忽略
+  // 故采用全量拉取建 map 本地匹配；startAt=0 即全时段累计
+  ;(function () {
+    if (window.__umamiReadCountInit) return
+    window.__umamiReadCountInit = true
+
+    const API = 'https://your-umami.example.com'
+    const SHARE_ID = 'YOUR_SHARE_ID'
+    const PLACEHOLDER = '--'
+    const DONE = 'done'
+    const CACHE_KEY = 'mcy:umami-pageviews'
+    const LIMIT = 2000
+
+    function todayStr() {
+      const d = new Date()
+      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate()
+    }
+
+    // 读取 / 写入每日缓存（map 全量，约几 KB）；损坏则视为无
+    function readCache() {
+      try {
+        const raw = sessionStorage.getItem(CACHE_KEY)
+        return raw ? JSON.parse(raw) : null
+      } catch (e) {
+        return null
+      }
+    }
+    function writeCache(day, map) {
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ day, map }))
+      } catch (e) {}
+    }
+
+    function format(n) {
+      return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    }
+
+    // 归一化 path：统一去掉尾部斜杠（旧 URL 记录 /a/b/ 与新 /a/b 视为同一篇）
+    function normalizePath(p) {
+      p = String(p || '')
+      if (p === '/') return p
+      return p.replace(/\/+$/g, '')
+    }
+
+    // 将缓存/最新的 map 应用到当前页面所有未加载节点
+    function applyMap(map) {
+      const nodes = Array.prototype.slice.call(document.querySelectorAll('.read-count[data-path]'))
+      nodes
+        .filter((el) => el.getAttribute('data-state') !== DONE)
+        .forEach((el) => {
+          const key = normalizePath(el.getAttribute('data-path') || '')
+          const value =
+            map && Object.prototype.hasOwnProperty.call(map, key) ? format(map[key]) : PLACEHOLDER
+          const node = el.querySelector('.read-count-value')
+          if (node) node.textContent = value
+          el.setAttribute('data-state', DONE)
+        })
+    }
+
+    async function getJson(url, headers) {
+      const res = await fetch(url, { headers })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      return res.json()
+    }
+
+    // 全流程：share 元数据 → metrics?type=path 全量；结果写当天缓存
+    async function load() {
+      const cached = readCache()
+      const day = todayStr()
+      if (cached && cached.day === day && cached.map) {
+        applyMap(cached.map)
+        return
+      }
+
+      try {
+        const meta = await getJson(API + '/api/share/' + SHARE_ID)
+        const h = {
+          'x-umami-share-token': meta.token,
+          'x-umami-share-context': '1',
+        }
+        const rows = await getJson(
+          API +
+            '/api/websites/' +
+            meta.websiteId +
+            '/metrics?type=path&startAt=0&endAt=' +
+            Date.now() +
+            '&limit=' +
+            LIMIT,
+          h,
+        )
+        const map = {}
+        ;(rows || []).forEach(function (row) {
+          // 同一篇文章可能以带/不带尾斜杠两条 path 记录（如 /2026/08/08/new-work 与旧 /2024/09/07/ode/）
+          // normalizePath 归一化后同名 key，浏览量按 key 累加合并，避免后写覆盖先写导致数字偏少
+          if (row && row.x != null) {
+            const key = normalizePath(row.x)
+            map[key] = (Number(map[key]) || 0) + (Number(row.y) || 0)
+          }
+        })
+        writeCache(day, map)
+        applyMap(map)
+      } catch (e) {
+        // 瞬时网络错误：不缓存，保持 "--"
+        applyMap(null)
+      }
+    }
+
+    // 拉取当前页所有未加载节点（Swup 切页后新页面节点会走缓存/重新请求）
+    function callLoad() {
+      if (document.readyState === 'loading') return
+      const pending = Array.prototype.slice
+        .call(document.querySelectorAll('.read-count[data-path]'))
+        .filter((el) => el.getAttribute('data-state') !== DONE)
+      if (!pending.length) return
+      load()
+    }
+
+    // 延迟到整页解析完成后执行，避免抢占首帧/阻塞 LCP
+    function start() {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', callLoad)
+      } else {
+        requestAnimationFrame(callLoad)
+      }
+    }
+
+    document.addEventListener('swup:content:replaced', callLoad)
+    document.addEventListener('astro:page-load', callLoad)
+    window.addEventListener('popstate', callLoad)
+
+    start()
+  })()
+</script>

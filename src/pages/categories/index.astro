@@ -1,0 +1,61 @@
+---
+import PageLayout from '@/layouts/PageLayout.astro'
+import Highlight from '@/components/Highlight.astro'
+import { getAllCategories } from '@/utils/content'
+
+const rawCategories = await getAllCategories()
+// 按文章数降序（多的在前），同数按名称排，视觉层级更稳
+const allCategories = [...rawCategories].sort(
+  (a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh'),
+)
+const totalPosts = allCategories.reduce((sum, cur) => sum + cur.count, 0)
+---
+
+<!-- 分类总览：与 /tags 同款 archetype；卡片复用 .cloud-badge + .glow-border 玻璃质感 -->
+<PageLayout title="分类">
+  <div class="max-w-[800px] mx-auto px-4 py-16">
+    <header class="space-y-4 mb-8">
+      <h1 class="text-4xl font-bold">
+        <Highlight>文章分类</Highlight>
+      </h1>
+      <p>共有 {allCategories.length} 个分类，{totalPosts} 篇文章。</p>
+    </header>
+
+    {
+      allCategories.length === 0 ? (
+        <div class="text-center text-sm text-secondary">作者懒得分类🤪</div>
+      ) : (
+        <ul class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {allCategories.map((category) => (
+            <li>
+              <a
+                href={`/categories/${category.slug}`}
+                class="cloud-badge group rounded-xl px-4 py-3.5 flex flex-col gap-2
+                  transition-all duration-300 ease-out hover:-translate-y-1 hover:glow-border
+                  focus-visible:outline-none focus-visible:glow-border"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <i class="iconfont icon-folder text-lg text-accent opacity-70 transition-opacity group-hover:opacity-100" />
+                  <span class="text-xs tabular-nums text-secondary">
+                    {category.count}
+                    <span class="opacity-70">篇</span>
+                  </span>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-lg font-bold text-primary tracking-wide transition-colors group-hover:text-accent">
+                    {category.name}
+                  </span>
+                  <i
+                    class="iconfont icon-arrow-right text-sm text-secondary opacity-0 -translate-x-1
+                      transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0"
+                    aria-hidden="true"
+                  />
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</PageLayout>
